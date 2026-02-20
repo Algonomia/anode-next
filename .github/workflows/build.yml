@@ -1,0 +1,33 @@
+name: Build & Push Docker Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build & push backend
+        run: |
+          TAG=${{ github.sha }}
+          docker build -f Dockerfile.backend -t ghcr.io/algonomia/anode-backend:${TAG} -t ghcr.io/algonomia/anode-backend:latest .
+          docker push ghcr.io/algonomia/anode-backend:${TAG}
+          docker push ghcr.io/algonomia/anode-backend:latest
+
+      - name: Build & push frontend
+        run: |
+          TAG=${{ github.sha }}
+          docker build -f Dockerfile.frontend -t ghcr.io/algonomia/anode-frontend:${TAG} -t ghcr.io/algonomia/anode-frontend:latest .
+          docker push ghcr.io/algonomia/anode-frontend:${TAG}
+          docker push ghcr.io/algonomia/anode-frontend:latest
