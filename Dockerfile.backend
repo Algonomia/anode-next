@@ -1,0 +1,50 @@
+# Stage 1: Build the C++ server
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libpqxx-dev \
+    libpq-dev \
+    libboost-all-dev \
+    libsqlite3-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+COPY CMakeLists.txt .
+COPY main.cpp .
+COPY src/ src/
+
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --target anodeServer -j$(nproc)
+
+# Stage 2: Runtime image
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpqxx-7.8t64 \
+    libpq5 \
+    libboost-system1.83.0 \
+    libsqlite3-0 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash appuser \
+    && mkdir -p /data /config \
+    && chown appuser:appuser /data /config
+
+COPY --from=builder /src/build/anodeServer /usr/local/bin/anodeServer
+
+USER appuser
+EXPOSE 8080
+
+ENTRYPOINT ["anodeServer"]
+CMD ["-p", "8080", "-a", "0.0.0.0", "--postgres", "@/config/postgres.conf", "-g", "/data/graphs.db", "-l", "info"]

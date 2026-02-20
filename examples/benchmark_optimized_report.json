@@ -1,0 +1,285 @@
+{
+  "dataset": {
+    "columns": 12,
+    "filename": "customers-500000.csv",
+    "rows": 500000
+  },
+  "results": [
+    {
+      "category": "IO",
+      "details": "",
+      "duration_ms": 1886,
+      "input_rows": 0,
+      "operation": "Load CSV (500,000 rows) - OPTIMIZED",
+      "output_rows": 500000
+    },
+    {
+      "category": "Filter",
+      "details": "",
+      "duration_ms": 1,
+      "input_rows": 500000,
+      "operation": "filter_equality_simple_OPT",
+      "output_rows": 2059
+    },
+    {
+      "category": "Filter",
+      "details": "",
+      "duration_ms": 10,
+      "input_rows": 500000,
+      "operation": "filter_contains_OPT",
+      "output_rows": 35740
+    },
+    {
+      "category": "Filter",
+      "details": "",
+      "duration_ms": 7,
+      "input_rows": 500000,
+      "operation": "filter_multi_condition_OPT",
+      "output_rows": 155
+    },
+    {
+      "category": "Filter",
+      "details": "",
+      "duration_ms": 21,
+      "input_rows": 500000,
+      "operation": "filter_email_domain_OPT",
+      "output_rows": 518
+    },
+    {
+      "category": "OrderBy",
+      "details": "",
+      "duration_ms": 90,
+      "input_rows": 500000,
+      "operation": "orderby_single_asc_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "OrderBy",
+      "details": "",
+      "duration_ms": 224,
+      "input_rows": 500000,
+      "operation": "orderby_single_desc_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "OrderBy",
+      "details": "",
+      "duration_ms": 219,
+      "input_rows": 500000,
+      "operation": "orderby_multi_2cols_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "OrderBy",
+      "details": "",
+      "duration_ms": 160,
+      "input_rows": 500000,
+      "operation": "orderby_multi_3cols_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "GroupBy",
+      "details": "",
+      "duration_ms": 9,
+      "input_rows": 500000,
+      "operation": "groupby_count_country_OPT",
+      "output_rows": 243
+    },
+    {
+      "category": "GroupBy",
+      "details": "",
+      "duration_ms": 72,
+      "input_rows": 500000,
+      "operation": "groupby_count_city_OPT",
+      "output_rows": 99160
+    },
+    {
+      "category": "GroupBy",
+      "details": "",
+      "duration_ms": 453,
+      "input_rows": 500000,
+      "operation": "groupby_multi_country_city_OPT",
+      "output_rows": 488055
+    },
+    {
+      "category": "GroupBy",
+      "details": "",
+      "duration_ms": 203,
+      "input_rows": 500000,
+      "operation": "groupby_count_company_OPT",
+      "output_rows": 326057
+    },
+    {
+      "category": "Select",
+      "details": "",
+      "duration_ms": 0,
+      "input_rows": 500000,
+      "operation": "select_3cols_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "Select",
+      "details": "",
+      "duration_ms": 0,
+      "input_rows": 500000,
+      "operation": "select_6cols_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "Chain",
+      "details": "",
+      "duration_ms": 2,
+      "input_rows": 500000,
+      "operation": "chain_filter_orderby_OPT",
+      "output_rows": 2059
+    },
+    {
+      "category": "Chain",
+      "details": "",
+      "duration_ms": 1,
+      "input_rows": 500000,
+      "operation": "chain_filter_orderby_select_OPT",
+      "output_rows": 2059
+    },
+    {
+      "category": "Chain",
+      "details": "",
+      "duration_ms": 15,
+      "input_rows": 500000,
+      "operation": "chain_filter_groupby_orderby_OPT",
+      "output_rows": 243
+    },
+    {
+      "category": "Export",
+      "details": "",
+      "duration_ms": 6,
+      "input_rows": 51,
+      "operation": "export_json_sample_OPT",
+      "output_rows": 2059
+    },
+    {
+      "category": "Export",
+      "details": "",
+      "duration_ms": 425,
+      "input_rows": 500000,
+      "operation": "export_csv_full_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "Export",
+      "details": "",
+      "duration_ms": 3,
+      "input_rows": 51,
+      "operation": "export_csv_filtered_OPT",
+      "output_rows": 2059
+    },
+    {
+      "category": "Join",
+      "details": "",
+      "duration_ms": 83,
+      "input_rows": 500000,
+      "operation": "innerJoin_country_lookup_OPT",
+      "output_rows": 20497
+    },
+    {
+      "category": "Join",
+      "details": "",
+      "duration_ms": 96,
+      "input_rows": 500000,
+      "operation": "flexJoin_country_SingleOnly_OPT",
+      "output_rows": 20497
+    },
+    {
+      "category": "Join",
+      "details": "",
+      "duration_ms": 2172,
+      "input_rows": 500000,
+      "operation": "flexJoin_country_KeepAll_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "Join",
+      "details": "",
+      "duration_ms": 2965,
+      "input_rows": 500000,
+      "operation": "flexJoin_country_KeepLeftOnly_OPT",
+      "output_rows": 500000
+    },
+    {
+      "category": "Join",
+      "details": "",
+      "duration_ms": 2568,
+      "input_rows": 500000,
+      "operation": "flexJoin_city_KeepAll_OPT",
+      "output_rows": 500000
+    }
+  ],
+  "statistics": {
+    "by_category": {
+      "Chain": {
+        "average_ms": 6,
+        "count": 3,
+        "max_ms": 15,
+        "min_ms": 1,
+        "total_ms": 18
+      },
+      "Export": {
+        "average_ms": 144,
+        "count": 3,
+        "max_ms": 425,
+        "min_ms": 3,
+        "total_ms": 434
+      },
+      "Filter": {
+        "average_ms": 9,
+        "count": 4,
+        "max_ms": 21,
+        "min_ms": 1,
+        "total_ms": 39
+      },
+      "GroupBy": {
+        "average_ms": 184,
+        "count": 4,
+        "max_ms": 453,
+        "min_ms": 9,
+        "total_ms": 737
+      },
+      "IO": {
+        "average_ms": 1886,
+        "count": 1,
+        "max_ms": 1886,
+        "min_ms": 1886,
+        "total_ms": 1886
+      },
+      "Join": {
+        "average_ms": 1576,
+        "count": 5,
+        "max_ms": 2965,
+        "min_ms": 83,
+        "total_ms": 7884
+      },
+      "OrderBy": {
+        "average_ms": 173,
+        "count": 4,
+        "max_ms": 224,
+        "min_ms": 90,
+        "total_ms": 693
+      },
+      "Select": {
+        "average_ms": 0,
+        "count": 2,
+        "max_ms": 0,
+        "min_ms": 0,
+        "total_ms": 0
+      }
+    },
+    "total_duration_ms": 11691,
+    "total_operations": 26
+  },
+  "system": {
+    "compiler": "g++ 13.3.0",
+    "os": "Linux"
+  },
+  "timestamp": "2026-02-02 17:02:16",
+  "version": "1.0.0-optimized"
+}

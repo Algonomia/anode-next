@@ -1,0 +1,91 @@
+replicaCount: 1
+
+image:
+  repository: anode
+  pullPolicy: IfNotPresent
+  tag: "latest"
+  imagePullSecrets:
+    - name: regcred-back
+
+# -- Ports exposed by the pod
+ports:
+  meta: 9090
+  api: 8080
+  client: 3000
+
+# -- Health probes (meta server /api/status)
+probe:
+  livenessProbe:
+    enabled: true
+    path: /api/status
+    port: 9090
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    enabled: true
+    path: /api/status
+    port: 9090
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# -- Resource requests/limits (build C++ needs headroom)
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "4Gi"
+    cpu: "4"
+
+# -- Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+
+# -- PostgreSQL credentials (Crunchy hippo-pguser-postgres secret)
+# Expected keys in secret: user, password, host, port, dbname
+postgres:
+  secretName: hippo-pguser-postgres
+
+# -- Environment variables injected into the container
+env:
+  GRAPHS_DB_PATH: "/app/data/graphs.db"
+  VITE_HOST: "0.0.0.0"
+
+# -- Persistent volume for graphs.db and build cache
+volume:
+  mountPath: /app/data
+  storageClassName: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+# -- Ingress for the app (api + client)
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls:
+    enabled: false
+    # -- Set secretName to use an existing TLS secret; leave empty for cert-manager auto-provisioning
+    secretName: ""
+    # -- cert-manager cluster issuer (e.g. "letsencrypt-prod")
+    clusterIssuer: ""
+  annotations: {}
+
+# -- Separate ingress for meta server (restricted access)
+metaIngress:
+  enabled: false
+  className: nginx
+  host: ""
+  allowedIPs: ""
+  tls:
+    enabled: false
+    secretName: ""
+    clusterIssuer: ""
+  annotations: {}

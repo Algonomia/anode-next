@@ -1,0 +1,209 @@
+{
+  "baseline": {
+    "file": "../examples/baseline_v1.0.0.json",
+    "timestamp": "2025-11-18 16:08:10",
+    "version": "1.0.0"
+  },
+  "comparisons": [
+    {
+      "baseline_ms": 220,
+      "category": "IO",
+      "current_ms": 205,
+      "diff_ms": -15,
+      "operation": "Load CSV (10,000 rows)",
+      "percent_change": -6.8181818181818175,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 2,
+      "category": "Filter",
+      "current_ms": 2,
+      "diff_ms": 0,
+      "operation": "filter_equality_simple",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 5,
+      "category": "Filter",
+      "current_ms": 4,
+      "diff_ms": -1,
+      "operation": "filter_contains",
+      "percent_change": -20.0,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 1,
+      "category": "Filter",
+      "current_ms": 1,
+      "diff_ms": 0,
+      "operation": "filter_multi_condition",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 1,
+      "category": "Filter",
+      "current_ms": 1,
+      "diff_ms": 0,
+      "operation": "filter_email_domain",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 52,
+      "category": "OrderBy",
+      "current_ms": 47,
+      "diff_ms": -5,
+      "operation": "orderby_single_asc",
+      "percent_change": -9.615384615384617,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 64,
+      "category": "OrderBy",
+      "current_ms": 57,
+      "diff_ms": -7,
+      "operation": "orderby_single_desc",
+      "percent_change": -10.9375,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 65,
+      "category": "OrderBy",
+      "current_ms": 56,
+      "diff_ms": -9,
+      "operation": "orderby_multi_2cols",
+      "percent_change": -13.846153846153847,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 66,
+      "category": "OrderBy",
+      "current_ms": 56,
+      "diff_ms": -10,
+      "operation": "orderby_multi_3cols",
+      "percent_change": -15.151515151515152,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 14,
+      "category": "GroupBy",
+      "current_ms": 13,
+      "diff_ms": -1,
+      "operation": "groupby_count_country",
+      "percent_change": -7.142857142857142,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 38,
+      "category": "GroupBy",
+      "current_ms": 32,
+      "diff_ms": -6,
+      "operation": "groupby_count_city",
+      "percent_change": -15.789473684210526,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 56,
+      "category": "GroupBy",
+      "current_ms": 49,
+      "diff_ms": -7,
+      "operation": "groupby_multi_country_city",
+      "percent_change": -12.5,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 36,
+      "category": "GroupBy",
+      "current_ms": 36,
+      "diff_ms": 0,
+      "operation": "groupby_count_company",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 0,
+      "category": "Select",
+      "current_ms": 0,
+      "diff_ms": 0,
+      "operation": "select_3cols",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 0,
+      "category": "Select",
+      "current_ms": 0,
+      "diff_ms": 0,
+      "operation": "select_6cols",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 3,
+      "category": "Chain",
+      "current_ms": 2,
+      "diff_ms": -1,
+      "operation": "chain_filter_orderby",
+      "percent_change": -33.33333333333333,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 2,
+      "category": "Chain",
+      "current_ms": 1,
+      "diff_ms": -1,
+      "operation": "chain_filter_orderby_select",
+      "percent_change": -50.0,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 7,
+      "category": "Chain",
+      "current_ms": 6,
+      "diff_ms": -1,
+      "operation": "chain_filter_groupby_orderby",
+      "percent_change": -14.285714285714285,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 2,
+      "category": "Export",
+      "current_ms": 2,
+      "diff_ms": 0,
+      "operation": "export_json_sample",
+      "percent_change": 0.0,
+      "status": "stable"
+    },
+    {
+      "baseline_ms": 52,
+      "category": "Export",
+      "current_ms": 45,
+      "diff_ms": -7,
+      "operation": "export_csv_full",
+      "percent_change": -13.461538461538462,
+      "status": "improved"
+    },
+    {
+      "baseline_ms": 2,
+      "category": "Export",
+      "current_ms": 2,
+      "diff_ms": 0,
+      "operation": "export_csv_filtered",
+      "percent_change": 0.0,
+      "status": "stable"
+    }
+  ],
+  "current": {
+    "file": "../examples/current_v1.1.0.json",
+    "timestamp": "2025-11-18 16:08:39",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "improved": 13,
+    "regressed": 0,
+    "stable": 8,
+    "total_operations": 21
+  }
+}

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnodeServer - Graphs</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 .logo {
+            color: #007bff;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn.primary { background: #007bff; color: white; }
+        .btn.primary:hover { background: #0056b3; }
+        .btn.secondary { background: #6c757d; color: white; }
+        .btn.secondary:hover { background: #545b62; }
+        .btn.success { background: #28a745; color: white; }
+        .btn.success:hover { background: #218838; }
+        .btn.outline {
+            background: transparent;
+            border: 1px solid #ddd;
+            color: #333;
+        }
+        .btn.outline:hover { background: #f5f5f5; }
+        .btn.small { padding: 6px 12px; font-size: 13px; }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .loading, .error, .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error { color: #dc3545; }
+        .error h2 { margin-bottom: 10px; }
+
+        .empty h2 { color: #333; margin-bottom: 10px; }
+
+        .graphs-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .graph-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px 24px;
+            transition: box-shadow 0.2s;
+        }
+
+        .graph-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+            font-family: monospace;
+        }
+
+        .card-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-status.active { background: #d4edda; color: #155724; }
+        .card-status.inactive { background: #f8f9fa; color: #6c757d; }
+
+        .card-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .card-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .card-meta .label { color: #666; }
+
+        .card-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            background: #e9ecef;
+            color: #495057;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .card-exec-info {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .card-exec-info .exec-time {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .card-exec-info .exec-details {
+            color: #888;
+            margin-left: 8px;
+        }
+
+        .card-exec-info.no-exec {
+            color: #888;
+            font-style: italic;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+            margin-top: 4px;
+        }
+
+        .card-updated {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .card-links {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .link-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-family: monospace;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .link-badge.out { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+        .link-badge.out:hover { background: #ffe0b2; }
+        .link-badge.in { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .link-badge.in:hover { background: #c8e6c9; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1><span class="logo">AnodeServer</span> - Graphs</h1>
+        <a href="/" class="btn primary">+ New Graph</a>
+    </header>
+
+    <div class="container">
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading graphs...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8080';
+
+        document.addEventListener('DOMContentLoaded', loadGraphs);
+
+        async function loadGraphs() {
+            const content = document.getElementById('content');
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/graphs`);
+                const result = await response.json();
+
+                if (result.status !== 'ok') {
+                    throw new Error(result.message || 'Failed to load graphs');
+                }
+
+                const graphs = result.graphs || [];
+
+                if (graphs.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty">
+                            <h2>No graphs yet</h2>
+                            <p>Create your first graph to get started.</p>
+                            <a href="/" class="btn primary" style="margin-top: 20px;">+ New Graph</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Fetch execution info for all graphs in parallel
+                const graphsWithExec = await Promise.all(
+                    graphs.map(async (graph) => {
+                        try {
+                            const execResponse = await fetch(`${BASE_URL}/api/graph/${graph.slug}/executions?limit=1`);
+                            const execResult = await execResponse.json();
+                            if (execResult.status === 'ok' && execResult.executions?.length > 0) {
+                                graph.lastExecution = execResult.executions[0];
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to load executions for ${graph.slug}:`, e);
+                        }
+                        return graph;
+                    })
+                );
+
+                renderGraphs(graphsWithExec);
+
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="error">
+                        <h2>Error loading graphs</h2>
+                        <p>${escapeHtml(error.message)}</p>
+                        <button class="btn primary" onclick="loadGraphs()" style="margin-top: 20px;">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderGraphs(graphs) {
+            const content = document.getElementById('content');
+
+            content.innerHTML = `
+                <div class="graphs-grid">
+                    ${graphs.map(renderGraphCard).join('')}
+                </div>
+            `;
+        }
+
+        function renderGraphCard(graph) {
+            const hasExec = graph.lastExecution;
+            const execInfo = hasExec
+                ? `<span class="exec-time">${formatTimeAgo(graph.lastExecution.started_at)}</span>
+                   <span class="exec-details">(${graph.lastExecution.duration_ms}ms, ${graph.lastExecution.nodes_executed || '?'} nodes)</span>`
+                : 'No executions yet';
+
+            const tags = graph.tags && graph.tags.length > 0
+                ? `<div class="card-tags">${graph.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`
+                : '';
+
+            const links = graph.links || { outgoing: [], incoming: [] };
+            const linkBadges = [
+                ...links.outgoing.map(s => `<a href="/?graph=${encodeURIComponent(s)}" class="link-badge out">\u2192 ${escapeHtml(s)}</a>`),
+                ...links.incoming.map(s => `<a href="/?graph=${encodeURIComponent(s)}" class="link-badge in">\u2190 ${escapeHtml(s)}</a>`)
+            ].join('');
+
+            const status = hasExec ? 'active' : 'inactive';
+            const statusLabel = hasExec ? 'Active' : 'New';
+
+            return `
+                <div class="graph-card">
+                    <div class="card-header">
+                        <h2 class="card-title">${escapeHtml(graph.slug)}</h2>
+                        <span class="card-status ${status}">${statusLabel}</span>
+                    </div>
+
+                    ${graph.description ? `<p class="card-description">${escapeHtml(graph.description)}</p>` : ''}
+
+                    <div class="card-meta">
+                        ${graph.author ? `<span><span class="label">Author:</span> ${escapeHtml(graph.author)}</span>` : ''}
+                        ${tags}
+                    </div>
+
+                    ${linkBadges ? `<div class="card-links">${linkBadges}</div>` : ''}
+
+                    <div class="card-exec-info ${hasExec ? '' : 'no-exec'}">
+                        Last execution: ${execInfo}
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="card-actions">
+                            <a href="viewer.html?graph=${encodeURIComponent(graph.slug)}" class="btn outline small">View</a>
+                            <a href="viewer.html?graph=${encodeURIComponent(graph.slug)}&panel=open" class="btn outline small">Configure</a>
+                            <a href="/?graph=${encodeURIComponent(graph.slug)}" class="btn outline small">Edit Graph</a>
+                            <button class="btn success small" onclick="executeGraph('${escapeHtml(graph.slug)}')">Execute</button>
+                        </div>
+                        <span class="card-updated">Updated: ${formatDate(graph.updated_at)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function executeGraph(slug) {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'ok') {
+                    btn.textContent = `Done (${result.duration_ms}ms)`;
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        loadGraphs(); // Refresh to show updated execution info
+                    }, 2000);
+                } else {
+                    throw new Error(result.message || 'Execution failed');
+                }
+            } catch (error) {
+                alert(`Execution error: ${error.message}`);
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function formatTimeAgo(dateStr) {
+            if (!dateStr) return 'Unknown';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSec = Math.floor(diffMs / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHour = Math.floor(diffMin / 60);
+            const diffDay = Math.floor(diffHour / 24);
+
+            if (diffSec < 60) return 'Just now';
+            if (diffMin < 60) return `${diffMin} min ago`;
+            if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+            if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+            return formatDate(dateStr);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Unknown';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = String(text ?? '');
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

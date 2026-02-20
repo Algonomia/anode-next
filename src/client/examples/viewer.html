@@ -1,0 +1,4075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Viewer</title>
+
+    <!-- AG Grid Enterprise CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/styles/ag-theme-alpine.css">
+
+    <!-- vis-timeline CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/vis-timeline@7.7.3/styles/vis-timeline-graph2d.min.css">
+
+    <style>
+        * { box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+        }
+
+        /* === Toolbar === */
+        .viewer-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toolbar-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #333;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        .toolbar-back:hover { background: #e0e0e0; }
+
+        .toolbar-title {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .toolbar-title .graph-name {
+            font-family: monospace;
+            color: #007bff;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn.primary { background: #007bff; color: white; }
+        .btn.primary:hover { background: #0056b3; }
+        .btn.secondary { background: #6c757d; color: white; }
+        .btn.secondary:hover { background: #545b62; }
+        .btn.success { background: #28a745; color: white; }
+        .btn.success:hover { background: #218838; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn.icon-only {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            justify-content: center;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn.icon-only:hover { background: #e0e0e0; }
+
+        /* === Main Content Area === */
+        .viewer-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            transition: margin-right 0.3s;
+            overflow: hidden;
+        }
+
+        body.panel-open .content-area { margin-right: 320px; }
+
+        /* === Output Section === */
+        .output-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* === Output Tabs === */
+        .output-tabs-container {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #fafafa;
+            flex-shrink: 0;
+        }
+
+        .output-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 12px 0;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        .output-tab {
+            padding: 8px 14px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: monospace;
+            color: #666;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .output-tab:hover { background: #e9ecef; color: #333; }
+
+        .output-tab.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .output-tab .badge {
+            background: rgba(0,0,0,0.15);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .output-tab.active .badge {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .no-outputs-tabs {
+            padding: 12px 0;
+            color: #888;
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        /* === Timeline Section === */
+        .timeline-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        #timeline-container {
+            height: 300px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .timeline-tab {
+            padding: 8px 14px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: monospace;
+            color: #666;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .timeline-tab:hover { background: #e9ecef; color: #333; }
+
+        .timeline-tab.active {
+            background: #6f42c1;
+            color: white;
+        }
+
+        .timeline-tab .badge {
+            background: rgba(0,0,0,0.15);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .timeline-tab.active .badge {
+            background: rgba(255,255,255,0.25);
+        }
+
+        /* === Drilldown Tabs === */
+        .drilldown-tab {
+            border-left: 3px solid #ff9800 !important;
+        }
+        .drilldown-tab.active.timeline-tab {
+            background: #ff9800;
+            color: white;
+        }
+        .drilldown-tab.active.output-tab {
+            background: #ff9800;
+            color: white;
+        }
+        .drilldown-separator {
+            width: 1px;
+            background: #ccc;
+            align-self: stretch;
+            margin: 4px 6px;
+            flex-shrink: 0;
+        }
+
+        /* === Grid Container === */
+        #grid-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* === Stats Bar === */
+        .stats-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .stats-bar span { display: flex; align-items: center; gap: 5px; }
+        .stats-bar strong { color: #333; }
+
+        .stats-bar.hidden { display: none; }
+
+        /* === Status Messages === */
+        .status-bar {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .status-bar.connected { background: #d4edda; color: #155724; }
+        .status-bar.error { background: #f8d7da; color: #721c24; }
+        .status-bar.loading { background: #fff3cd; color: #856404; }
+        .status-bar.info { background: #e8f4fd; color: #004085; }
+
+        /* === No Outputs State === */
+        .no-outputs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .no-outputs h2 { margin-bottom: 10px; color: #333; }
+        .no-outputs p { margin: 5px 0; }
+
+        /* === Right Panel === */
+        .right-panel {
+            position: fixed;
+            right: -320px;
+            top: 0;
+            width: 320px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s;
+        }
+
+        body.panel-open .right-panel { right: 0; }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: #f8f9fa;
+            flex-shrink: 0;
+        }
+
+        .panel-header h3 { margin: 0; font-size: 16px; }
+
+        .panel-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .panel-close:hover { color: #333; }
+
+        /* === Panel Tabs === */
+        .panel-tabs {
+            display: flex;
+            border-bottom: 1px solid #e9ecef;
+            flex-shrink: 0;
+        }
+
+        .panel-tab {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-size: 13px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .panel-tab:hover { color: #333; }
+
+        .panel-tab.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+            background: white;
+        }
+
+        .panel-tab .count {
+            background: #e9ecef;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .panel-tab.active .count {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        /* === Panel Body === */
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* === Parameters Tab === */
+        #tab-parameters { padding: 15px; }
+
+        .param-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-left: 3px solid #007bff;
+        }
+
+        .param-item.saving { border-left-color: #ffc107; }
+        .param-item.saved { border-left-color: #28a745; }
+        .param-item.error { border-left-color: #dc3545; }
+
+        .param-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .param-name { font-weight: 600; font-family: monospace; }
+
+        .param-type {
+            font-size: 11px;
+            color: #6c757d;
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .param-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.15);
+        }
+
+        .param-toggle { display: flex; align-items: center; gap: 10px; }
+
+        .toggle-switch { position: relative; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #ccc;
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider { background: #007bff; }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .param-status {
+            font-size: 11px;
+            margin-top: 6px;
+            min-height: 14px;
+        }
+
+        .param-status.saving { color: #ffc107; }
+        .param-status.saved { color: #28a745; }
+        .param-status.error { color: #dc3545; }
+
+        /* === CSV Parameter Styles === */
+        .csv-param-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+        .csv-upload-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; background: #007bff; color: white;
+            border: none; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+        .csv-upload-btn:hover { background: #0056b3; }
+        .csv-clear-btn {
+            padding: 6px 12px; background: #f8f9fa; color: #dc3545;
+            border: 1px solid #dc3545; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+        .csv-clear-btn:hover { background: #dc3545; color: white; }
+
+        /* === Fields Parameter Styles === */
+        .fields-list { display: flex; flex-direction: column; gap: 4px; }
+        .fields-row { display: flex; gap: 4px; align-items: center; }
+        .fields-row input {
+            flex: 1; padding: 6px 8px; border: 1px solid #ddd;
+            border-radius: 4px; font-size: 13px;
+        }
+        .fields-row input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,0.15); }
+        .fields-actions { display: flex; gap: 6px; margin-top: 6px; }
+        .fields-btn {
+            width: 28px; height: 28px; border-radius: 4px; border: 1px solid #ddd;
+            background: #f8f9fa; cursor: pointer; font-size: 16px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .fields-btn:hover { background: #e9ecef; }
+        .fields-btn.add { color: #28a745; border-color: #28a745; }
+        .fields-btn.remove { color: #dc3545; border-color: #dc3545; }
+        .csv-preview {
+            max-height: 240px; overflow: auto;
+            border: 1px solid #dee2e6; border-radius: 4px; margin-top: 8px;
+        }
+        .csv-preview table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace; }
+        .csv-preview th {
+            background: #e9ecef; padding: 4px 8px; text-align: left;
+            border-bottom: 2px solid #dee2e6; position: sticky; top: 0; white-space: nowrap;
+        }
+        .csv-preview td {
+            padding: 3px 8px; border-bottom: 1px solid #f1f3f5;
+            white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+        }
+        .csv-preview tr:hover td { background: #f8f9fa; }
+        .csv-info { font-size: 11px; color: #6c757d; margin-top: 6px; }
+
+        .no-params {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* === Equations Tab === */
+        #tab-equations { padding: 15px; }
+
+        .dynamic-zone {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+
+        .dynamic-zone:last-child { margin-bottom: 0; }
+
+        .dynamic-zone-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .dynamic-zone-name {
+            font-weight: 600;
+            color: #333;
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .dynamic-zone textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .dynamic-zone textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.15);
+        }
+
+        .dynamic-zone .hint {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 6px;
+        }
+
+        .equations-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .equations-toolbar .btn { flex: 1; justify-content: center; }
+
+        .no-equations {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Triggers Tab */
+        .trigger-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .trigger-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .trigger-type-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #212529;
+        }
+        .trigger-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .trigger-fields-info {
+            font-size: 11px;
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+        .trigger-csv-target {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        .trigger-csv-target label {
+            flex: 0 0 auto;
+            color: #495057;
+            font-weight: 500;
+        }
+        .trigger-csv-target select {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .trigger-actions {
+            margin-top: 10px;
+            text-align: right;
+        }
+        .trigger-actions button {
+            background: none;
+            border: 1px solid #dc3545;
+            color: #dc3545;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .trigger-actions button:hover { background: #dc3545; color: #fff; }
+        .triggers-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+            position: relative;
+        }
+        .triggers-toolbar .btn { flex: 1; justify-content: center; }
+        .trigger-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            margin-top: 4px;
+        }
+        .trigger-dropdown-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        .trigger-dropdown-item:last-child { border-bottom: none; }
+        .trigger-dropdown-item:hover { background: #f8f9fa; }
+        .trigger-dropdown-item .name { font-weight: 600; font-size: 13px; }
+        .trigger-dropdown-item .desc { font-size: 11px; color: #6c757d; margin-top: 2px; }
+        .no-triggers {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        .trigger-status {
+            font-size: 11px;
+            margin-top: 4px;
+            min-height: 16px;
+        }
+        .trigger-status.saving { color: #ffc107; }
+        .trigger-status.saved { color: #28a745; }
+        .trigger-status.error { color: #dc3545; }
+
+        /* === Scenario Mode === */
+        .btn.secondary.active { background: #343a40; }
+
+        #scenario-mode {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        #scenario-mode.visible {
+            display: block;
+        }
+
+        .scenario-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .scenario-header h2 { margin: 0; font-size: 18px; color: #333; }
+
+        .scenario-header-actions { display: flex; gap: 8px; }
+
+        .scenario-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .scenario-card:hover { border-color: #007bff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+        .scenario-card-left { flex: 1; min-width: 0; }
+        .scenario-card-name { font-weight: 600; font-size: 14px; color: #212529; }
+        .scenario-card-meta { font-size: 12px; color: #6c757d; margin-top: 4px; }
+
+        .scenario-card-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .scenario-badge {
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .scenario-badge.pass { background: #d4edda; color: #155724; }
+        .scenario-badge.fail { background: #f8d7da; color: #721c24; }
+        .scenario-badge.not-run { background: #e9ecef; color: #6c757d; }
+
+        .scenario-card-actions { display: flex; gap: 6px; }
+        .scenario-card-actions button {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            background: white;
+        }
+        .scenario-card-actions button:hover { background: #f8f9fa; }
+        .scenario-card-actions button.run-btn { color: #28a745; border-color: #28a745; }
+        .scenario-card-actions button.run-btn:hover { background: #28a745; color: #fff; }
+        .scenario-card-actions button.del-btn { color: #dc3545; border-color: #dc3545; }
+        .scenario-card-actions button.del-btn:hover { background: #dc3545; color: #fff; }
+
+        .no-scenarios { text-align: center; color: #6c757d; font-style: italic; padding: 40px 20px; }
+
+        /* === Scenario Editor Overlay === */
+        #scenario-editor-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        #scenario-editor-overlay.visible { display: flex; }
+
+        #scenario-editor {
+            background: white;
+            border-radius: 10px;
+            width: 90vw;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .editor-header h3 { margin: 0; font-size: 16px; }
+        .editor-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #6c757d; }
+        .editor-close:hover { color: #333; }
+
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .editor-section { margin-bottom: 20px; }
+        .editor-section h4 { margin: 0 0 10px; font-size: 14px; color: #495057; border-bottom: 1px solid #e9ecef; padding-bottom: 6px; }
+
+        .editor-field { margin-bottom: 12px; }
+        .editor-field label { display: block; font-size: 12px; font-weight: 600; color: #6c757d; margin-bottom: 4px; }
+        .editor-field input[type="text"],
+        .editor-field textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .editor-field textarea { min-height: 50px; resize: vertical; }
+
+        .editor-input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        .editor-input-row .input-id { font-family: monospace; font-size: 13px; font-weight: 500; min-width: 140px; }
+        .editor-input-row .input-type { font-size: 11px; color: #6c757d; min-width: 50px; }
+        .editor-input-row input { flex: 1; padding: 4px 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 13px; }
+
+        .editor-expected-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .editor-expected-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .editor-expected-name { font-weight: 600; font-size: 13px; font-family: monospace; }
+        .editor-expected-actions button {
+            padding: 2px 8px;
+            border: 1px solid #dc3545;
+            color: #dc3545;
+            background: white;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .editor-expected-actions button:hover { background: #dc3545; color: white; }
+
+        .editor-trigger-item {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .editor-trigger-header {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+        }
+        .editor-trigger-type { font-weight: 600; font-size: 13px; }
+
+        .editor-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 14px 20px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        /* Run results */
+        .run-results {
+            margin-top: 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .run-results-header {
+            padding: 10px 14px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .run-results-header.pass { background: #d4edda; color: #155724; }
+        .run-results-header.fail { background: #f8d7da; color: #721c24; }
+        .run-result-item { padding: 8px 14px; border-top: 1px solid #dee2e6; font-size: 13px; }
+        .run-result-item.match { color: #155724; }
+        .run-result-item.mismatch { color: #721c24; }
+        .mismatch-detail { font-family: monospace; font-size: 11px; color: #6c757d; margin-top: 4px; padding-left: 12px; }
+
+        /* === Diff Section === */
+        .diff-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diff-tab {
+            padding: 8px 14px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: monospace;
+            color: #666;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .diff-tab:hover { background: #e9ecef; color: #333; }
+
+        .diff-tab.active {
+            background: #e67e22;
+            color: white;
+        }
+
+        .diff-tab .badge {
+            background: rgba(0,0,0,0.15);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .diff-tab.active .badge {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .diff-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            margin-left: auto;
+            padding-right: 8px;
+        }
+
+        .diff-stats .stat-added { color: #155724; }
+        .diff-stats .stat-removed { color: #721c24; }
+        .diff-stats .stat-modified { color: #856404; }
+        .diff-stats .stat-unchanged { color: #666; }
+
+        .diff-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            font-size: 12px;
+        }
+
+        .diff-toolbar label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            color: #495057;
+        }
+
+        .diff-grids {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .diff-grid-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .diff-grid-panel:first-child {
+            border-right: 2px solid #dee2e6;
+        }
+
+        .diff-grid-label {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .diff-grid-panel .ag-theme-alpine {
+            width: 100%;
+        }
+
+        .diff-row-added { background-color: #d4edda !important; }
+        .diff-row-removed { background-color: #f8d7da !important; }
+        .diff-row-modified { background-color: #fff3cd !important; }
+        .diff-cell-changed { background-color: #ffc107 !important; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <!-- Toolbar -->
+    <div class="viewer-toolbar">
+        <div class="toolbar-left">
+            <a href="graphs.html" class="toolbar-back" title="Back to graphs">&#8592;</a>
+            <h1 class="toolbar-title">Graph Viewer - <span class="graph-name" id="graph-name"></span></h1>
+        </div>
+        <div class="toolbar-actions">
+            <a href="#" id="edit-link" class="btn secondary">Edit Graph</a>
+            <button class="btn secondary" onclick="toggleScenarioMode()" id="scenario-btn">Scenarios</button>
+            <button class="btn success" onclick="executeGraph()" id="execute-btn">Execute</button>
+            <button class="btn primary" onclick="reloadOutputs()" id="reload-btn">Reload</button>
+            <button class="btn icon-only" onclick="togglePanel()" title="Settings">&#9881;</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="viewer-main">
+        <div class="content-area">
+            <!-- Timeline Section (above grids, hidden if no timelines) -->
+            <div id="timeline-section" class="timeline-section" style="display:none;">
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="timeline-tabs"></div>
+                </div>
+                <div id="timeline-container"></div>
+            </div>
+
+            <!-- Diff Section (between timeline and grid, hidden if no diffs) -->
+            <div id="diff-section" class="diff-section" style="display:none;">
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="diff-tabs"></div>
+                    <div class="diff-stats" id="diff-stats"></div>
+                </div>
+                <div class="diff-toolbar" id="diff-toolbar">
+                    <label>
+                        <input type="checkbox" id="diff-show-unchanged" checked onchange="toggleDiffUnchanged(this.checked)">
+                        Show unchanged rows
+                    </label>
+                </div>
+                <div class="diff-grids">
+                    <div class="diff-grid-panel">
+                        <div class="diff-grid-label">Before (left)</div>
+                        <div id="diff-grid-left" class="ag-theme-alpine" style="width:100%;height:370px;"></div>
+                    </div>
+                    <div class="diff-grid-panel">
+                        <div class="diff-grid-label">After (right)</div>
+                        <div id="diff-grid-right" class="ag-theme-alpine" style="width:100%;height:370px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Section (between diff and grid, hidden if no charts) -->
+            <div id="chart-section" style="display:none;">
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="chart-tabs"></div>
+                </div>
+                <div id="chart-breadcrumb" style="display:none; padding: 8px 12px; font-size: 14px;"></div>
+                <div id="chart-container" style="width: 100%; height: 500px;"></div>
+            </div>
+
+            <div class="output-section">
+                <!-- Output Tabs -->
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="output-tabs">
+                        <span class="no-outputs-tabs">No outputs available</span>
+                    </div>
+                </div>
+
+                <!-- Grid Container -->
+                <div id="grid-container" class="ag-theme-alpine"></div>
+
+                <!-- Stats Bar -->
+                <div id="stats-bar" class="stats-bar hidden"></div>
+
+                <!-- Status Bar -->
+                <div id="status" class="status-bar info">Click "Reload" to fetch available outputs...</div>
+            </div>
+        </div>
+
+        <!-- Scenario Mode -->
+        <div id="scenario-mode">
+            <div class="scenario-header">
+                <h2>Test Scenarios</h2>
+                <div class="scenario-header-actions">
+                    <button class="btn success" onclick="runAllScenarios()" id="run-all-btn">Run All</button>
+                    <button class="btn primary" onclick="createScenario()">+ New Scenario</button>
+                </div>
+            </div>
+            <div id="scenario-list"></div>
+        </div>
+    </div>
+
+    <!-- Scenario Editor Overlay -->
+    <div id="scenario-editor-overlay">
+        <div id="scenario-editor">
+            <div class="editor-header">
+                <h3 id="editor-title">Edit Scenario</h3>
+                <button class="editor-close" onclick="closeScenarioEditor()">&times;</button>
+            </div>
+            <div class="editor-body">
+                <div class="editor-section">
+                    <h4>Info</h4>
+                    <div class="editor-field">
+                        <label>Name</label>
+                        <input type="text" id="editor-name" placeholder="Scenario name">
+                    </div>
+                    <div class="editor-field">
+                        <label>Description</label>
+                        <textarea id="editor-description" placeholder="Optional description"></textarea>
+                    </div>
+                </div>
+                <div class="editor-section">
+                    <h4>Parameter Overrides</h4>
+                    <div id="editor-inputs"></div>
+                </div>
+                <div class="editor-section">
+                    <h4>Trigger Simulation</h4>
+                    <div id="editor-triggers"></div>
+                </div>
+                <div class="editor-section">
+                    <h4>Expected Outputs</h4>
+                    <div id="editor-expected-actions" style="margin-bottom:10px;">
+                        <button class="btn secondary" onclick="captureExpectedOutputs()" style="font-size:12px;">Capture from Last Execution</button>
+                    </div>
+                    <div id="editor-expected"></div>
+                </div>
+                <div id="editor-run-results"></div>
+            </div>
+            <div class="editor-footer">
+                <button class="btn secondary" onclick="closeScenarioEditor()">Close</button>
+                <button class="btn primary" onclick="saveScenario()">Save</button>
+                <button class="btn success" onclick="saveAndRunScenario()">Save &amp; Run</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div id="right-panel" class="right-panel">
+        <div class="panel-header">
+            <h3>Settings</h3>
+            <button class="panel-close" onclick="togglePanel()">&times;</button>
+        </div>
+        <div class="panel-tabs">
+            <button class="panel-tab active" data-tab="parameters" onclick="switchPanelTab('parameters')">
+                Parameters <span class="count" id="params-count">0</span>
+            </button>
+            <button class="panel-tab" data-tab="equations" onclick="switchPanelTab('equations')">
+                Equations <span class="count" id="equations-count">0</span>
+            </button>
+            <button class="panel-tab" data-tab="triggers" onclick="switchPanelTab('triggers')">
+                Triggers <span class="count" id="triggers-count">0</span>
+            </button>
+        </div>
+        <div class="panel-body">
+            <!-- Parameters Tab -->
+            <div id="tab-parameters" class="tab-content active">
+                <div id="parameters-list"></div>
+            </div>
+            <!-- Equations Tab -->
+            <div id="tab-equations" class="tab-content">
+                <div id="dynamic-zones"></div>
+                <div class="equations-toolbar" id="equations-toolbar" style="display: none;">
+                    <button class="btn primary" onclick="applyDynamic()" id="apply-dynamic-btn">Apply</button>
+                    <button class="btn secondary" onclick="clearEquations()">Clear</button>
+                </div>
+            </div>
+            <!-- Triggers Tab -->
+            <div id="tab-triggers" class="tab-content">
+                <div id="triggers-list"></div>
+                <div class="triggers-toolbar" id="triggers-toolbar">
+                    <button class="btn primary" onclick="openAddTriggerDropdown(this)">+ Add Trigger</button>
+                    <div id="add-trigger-dropdown" class="trigger-dropdown" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AG Grid Enterprise JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/dist/ag-grid-enterprise.min.js"></script>
+
+    <!-- vis-timeline JS -->
+    <script src="https://unpkg.com/vis-timeline@7.7.3/standalone/umd/vis-timeline-graph2d.min.js"></script>
+
+    <!-- amCharts 5 -->
+    <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/xy.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+
+    <script>
+        // === URL Parameter Handling ===
+        function getGraphSlug() {
+            const params = new URLSearchParams(window.location.search);
+            const slug = params.get('graph');
+            if (!slug) {
+                window.location.href = 'graphs.html';
+                return null;
+            }
+            return slug;
+        }
+
+        const GRAPH_SLUG = getGraphSlug();
+        if (!GRAPH_SLUG) throw new Error('Redirecting...');
+
+        // Configuration
+        const BASE_URL = 'http://localhost:8080';
+        const PAGE_SIZE = 100;
+
+        // State
+        let gridApi = null;
+        let currentOutput = null;
+        let outputs = [];
+        let gridOutputs = [];
+        let timelineOutputs = [];
+        let diffOutputs = [];
+        let currentDiff = null;
+        let diffGridLeftApi = null;
+        let diffGridRightApi = null;
+        let diffShowUnchanged = true;
+        let currentTimeline = null;
+        let timelineInstance = null;
+        let dynamicZones = [];
+        let chartOutputs = [];
+        let currentChart = null;
+        let chartRoot = null;       // amCharts root instance (for cleanup)
+        let chartRowData = null;    // { columns, rows, metadata } for drilldown
+        let chartTreeAllRows = null; // all row objects for tree mode
+        let chartTreePath = [];      // breadcrumb path: ["Europe", "France"]
+
+        // Drilldown State
+        let drilldownSlug = null;
+        let drilldownGridOutputs = [];
+        let drilldownTimelineOutputs = [];
+        let drilldownDiffOutputs = [];
+        let drilldownChartOutputs = [];
+        let currentDrilldownOutput = null;
+        let timelineRowData = null;    // { columns: [...], rows: [...] }
+
+        // Panel State
+        let graphData = null;
+        let parameterNodes = [];
+        let panelOpen = localStorage.getItem('viewerPanelOpen') === 'true';
+        let saveTimers = {};
+
+        // Check if panel should open from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('panel') === 'open') {
+            panelOpen = true;
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set graph name in UI
+            document.getElementById('graph-name').textContent = GRAPH_SLUG;
+            document.getElementById('edit-link').href = `/?graph=${encodeURIComponent(GRAPH_SLUG)}`;
+            document.title = `Graph Viewer - ${GRAPH_SLUG}`;
+
+            initPanel();
+            loadDynamicZones();
+            reloadOutputs();
+        });
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status-bar ${type}`;
+        }
+
+        // ========== Output Tabs ==========
+
+        function renderOutputTabs(outputs) {
+            const container = document.getElementById('output-tabs');
+
+            if (outputs.length === 0) {
+                container.innerHTML = '<span class="no-outputs-tabs">No outputs available</span>';
+                return;
+            }
+
+            container.innerHTML = outputs.map((o, i) => `
+                <button class="output-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectOutput('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectOutput(outputName) {
+            // Update active tab
+            document.querySelectorAll('.output-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === outputName);
+            });
+
+            currentDrilldownOutput = null; // switch back to primary
+            currentOutput = gridOutputs.find(o => o.name === outputName);
+            if (currentOutput) {
+                initGrid(currentOutput.columns);
+            }
+        }
+
+        // ========== Timeline ==========
+
+        function renderTimelineTabs(timelines) {
+            const section = document.getElementById('timeline-section');
+            const container = document.getElementById('timeline-tabs');
+
+            if (timelines.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            container.innerHTML = timelines.map((o, i) => `
+                <button class="timeline-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectTimeline('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectTimeline(outputName) {
+            document.querySelectorAll('.timeline-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === outputName);
+            });
+
+            currentTimeline = timelineOutputs.find(o => o.name === outputName);
+            if (currentTimeline) {
+                loadTimelineData(currentTimeline);
+            }
+        }
+
+        async function loadTimelineData(output, slug) {
+            slug = slug || GRAPH_SLUG;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/output/${output.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 10000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const meta = output.metadata || {};
+                const columns = result.columns;
+                const rows = result.data;
+
+                const startIdx = columns.indexOf(meta.start_date);
+                const nameIdx = columns.indexOf(meta.name);
+                const endIdx = meta.end_date ? columns.indexOf(meta.end_date) : -1;
+                const parentIdx = meta.parent ? columns.indexOf(meta.parent) : -1;
+                const colorIdx = (meta.color && meta.color_is_field) ? columns.indexOf(meta.color) : -1;
+                const fixedColor = (meta.color && !meta.color_is_field) ? meta.color : null;
+
+                if (startIdx < 0 || nameIdx < 0) return;
+
+                // Store row data for drill-down click handling
+                if (meta.event) {
+                    timelineRowData = { columns, rows, metadata: meta };
+                } else {
+                    timelineRowData = null;
+                }
+
+                // Build vis-timeline items
+                const items = [];
+                const groupSet = new Set();
+
+                for (let r = 0; r < rows.length; r++) {
+                    const row = rows[r];
+                    const item = {
+                        id: r,
+                        content: String(row[nameIdx] ?? ''),
+                        start: row[startIdx]
+                    };
+
+                    if (endIdx >= 0 && row[endIdx]) {
+                        item.end = row[endIdx];
+                    } else {
+                        item.type = 'point';
+                    }
+
+                    if (parentIdx >= 0 && row[parentIdx] != null && row[parentIdx] !== '') {
+                        const g = String(row[parentIdx]);
+                        item.group = g;
+                        groupSet.add(g);
+                    }
+
+                    // Color
+                    const color = colorIdx >= 0 ? row[colorIdx] : fixedColor;
+                    if (color) {
+                        item.style = `background-color: ${color}; border-color: ${color};`;
+                    }
+
+                    items.push(item);
+                }
+
+                // Build groups
+                const groups = Array.from(groupSet).sort().map(g => ({ id: g, content: g }));
+
+                renderTimeline(items, groups);
+            } catch (e) {
+                console.error('Timeline load error:', e);
+            }
+        }
+
+        function renderTimeline(items, groups) {
+            const container = document.getElementById('timeline-container');
+            container.innerHTML = '';
+
+            if (timelineInstance) {
+                timelineInstance.destroy();
+                timelineInstance = null;
+            }
+
+            const dataset = new vis.DataSet(items);
+            const options = {
+                stack: true,
+                zoomMin: 1000 * 60 * 60,       // 1 hour
+                zoomMax: 1000 * 60 * 60 * 24 * 365 * 10, // 10 years
+                orientation: { axis: 'both' },
+                margin: { item: 4 }
+            };
+
+            if (groups.length > 0) {
+                const groupDataset = new vis.DataSet(groups);
+                timelineInstance = new vis.Timeline(container, dataset, groupDataset, options);
+            } else {
+                timelineInstance = new vis.Timeline(container, dataset, options);
+            }
+
+            timelineInstance.fit();
+
+            // Drill-down: click handler when event metadata is present
+            if (timelineRowData && timelineRowData.metadata.event) {
+                timelineInstance.on('select', function(properties) {
+                    if (properties.items.length === 0) return;
+                    handleTimelineClick(properties.items[0]);
+                });
+            }
+        }
+
+        // ========== Charts (amCharts 5) ==========
+
+        function renderChartTabs(charts) {
+            const section = document.getElementById('chart-section');
+            const container = document.getElementById('chart-tabs');
+
+            if (charts.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            container.innerHTML = charts.map((o, i) => `
+                <button class="chart-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectChart('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectChart(chartName) {
+            document.querySelectorAll('.chart-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === chartName);
+            });
+
+            currentChart = chartOutputs.find(o => o.name === chartName);
+            if (currentChart) {
+                loadChartData(currentChart);
+            }
+        }
+
+        async function loadChartData(output, slug) {
+            slug = slug || GRAPH_SLUG;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/output/${output.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 100000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const meta = output.metadata || {};
+                const columns = result.columns;
+                const data = result.data;
+
+                // Convert columnar data to row objects
+                const rows = [];
+                for (let r = 0; r < data.length; r++) {
+                    const row = {};
+                    for (let c = 0; c < columns.length; c++) {
+                        row[columns[c]] = data[r][c];
+                    }
+                    rows.push(row);
+                }
+
+                if (meta.tree_mode) {
+                    // Tree mode: internal drilldown via __tree_path
+                    chartTreeAllRows = rows;
+                    chartTreePath = [];
+                    chartRowData = null;
+                    renderTreeBarChart(rows, meta, [], meta.tree_agg || 'sum');
+                } else {
+                    // Flat mode
+                    chartTreeAllRows = null;
+                    chartTreePath = [];
+                    document.getElementById('chart-breadcrumb').style.display = 'none';
+
+                    if (meta.event) {
+                        chartRowData = { columns, rows: data, metadata: meta };
+                    } else {
+                        chartRowData = null;
+                    }
+
+                    renderBarChart(rows, meta);
+                }
+            } catch (e) {
+                console.error('Chart load error:', e);
+            }
+        }
+
+        function renderBarChart(rows, metadata) {
+            // Cleanup previous chart
+            if (chartRoot) {
+                chartRoot.dispose();
+                chartRoot = null;
+            }
+
+            const container = document.getElementById('chart-container');
+            chartRoot = am5.Root.new(container);
+            chartRoot.setThemes([am5themes_Animated.new(chartRoot)]);
+
+            const chart = chartRoot.container.children.push(
+                am5xy.XYChart.new(chartRoot, {
+                    panX: true,
+                    panY: false,
+                    wheelX: 'panX',
+                    wheelY: 'zoomX',
+                    layout: chartRoot.verticalLayout
+                })
+            );
+
+            // X Axis (categories)
+            const xAxis = chart.xAxes.push(
+                am5xy.CategoryAxis.new(chartRoot, {
+                    categoryField: metadata.category,
+                    renderer: am5xy.AxisRendererX.new(chartRoot, { minGridDistance: 30 }),
+                })
+            );
+            xAxis.data.setAll(rows);
+
+            // Rotate labels if many categories
+            if (rows.length > 10) {
+                xAxis.get('renderer').labels.template.setAll({
+                    rotation: -45,
+                    centerY: am5.p50,
+                    centerX: am5.p100,
+                    fontSize: 12
+                });
+            }
+
+            // Y Axis (values)
+            const yAxis = chart.yAxes.push(
+                am5xy.ValueAxis.new(chartRoot, {
+                    renderer: am5xy.AxisRendererY.new(chartRoot, {}),
+                })
+            );
+
+            // Series
+            const series = chart.series.push(
+                am5xy.ColumnSeries.new(chartRoot, {
+                    name: metadata.value,
+                    xAxis: xAxis,
+                    yAxis: yAxis,
+                    valueYField: metadata.value,
+                    categoryXField: metadata.category,
+                    tooltip: am5.Tooltip.new(chartRoot, {
+                        labelText: '{categoryX}: {valueY}'
+                    }),
+                })
+            );
+            series.data.setAll(rows);
+
+            // Color handling
+            if (metadata.color_is_field) {
+                series.columns.template.adapters.add('fill', function(fill, target) {
+                    const dataItem = target.dataItem;
+                    if (dataItem) {
+                        const color = dataItem.dataContext[metadata.color];
+                        if (color) return am5.color(color);
+                    }
+                    return fill;
+                });
+                series.columns.template.adapters.add('stroke', function(stroke, target) {
+                    const dataItem = target.dataItem;
+                    if (dataItem) {
+                        const color = dataItem.dataContext[metadata.color];
+                        if (color) return am5.color(color);
+                    }
+                    return stroke;
+                });
+            } else if (metadata.color) {
+                series.columns.template.setAll({
+                    fill: am5.color(metadata.color),
+                    stroke: am5.color(metadata.color)
+                });
+            }
+
+            // Drilldown: click on column
+            if (metadata.event) {
+                series.columns.template.events.on('click', function(ev) {
+                    const dataItem = ev.target.dataItem;
+                    const rowIndex = rows.indexOf(dataItem.dataContext);
+                    if (rowIndex >= 0) handleChartClick(rowIndex);
+                });
+                series.columns.template.setAll({ cursorOverStyle: 'pointer' });
+            }
+
+            series.appear(1000);
+            chart.appear(1000, 100);
+        }
+
+        // ---- Tree bar chart (hierarchical drilldown) ----
+
+        function aggregateValues(values, aggFunc) {
+            if (values.length === 0) return 0;
+            switch (aggFunc) {
+                case 'sum':   return values.reduce((a, b) => a + b, 0);
+                case 'avg':   return values.reduce((a, b) => a + b, 0) / values.length;
+                case 'min':   return Math.min(...values);
+                case 'max':   return Math.max(...values);
+                case 'first': return values[0];
+                case 'count': return values.length;
+                default:      return values.reduce((a, b) => a + b, 0);
+            }
+        }
+
+        function renderTreeBarChart(allRows, metadata, path, aggFunc) {
+            chartTreePath = path;
+            const depth = path.length;
+            const valueField = metadata.value;
+
+            // Filter rows matching the current path
+            const filtered = allRows.filter(row => {
+                if (!row.__tree_path) return false;
+                const tp = JSON.parse(row.__tree_path);
+                if (tp.length <= depth) return false;
+                for (let i = 0; i < depth; i++) {
+                    if (String(tp[i]) !== String(path[i])) return false;
+                }
+                return true;
+            });
+
+            // Determine max depth across filtered rows
+            let maxDepth = 0;
+            filtered.forEach(row => {
+                const tp = JSON.parse(row.__tree_path);
+                if (tp.length > maxDepth) maxDepth = tp.length;
+            });
+
+            const isLeaf = (depth >= maxDepth);
+
+            // Group by tree_path[depth] and aggregate
+            const groups = {};
+            filtered.forEach(row => {
+                const tp = JSON.parse(row.__tree_path);
+                const key = String(tp[depth] || '(leaf)');
+                if (!groups[key]) groups[key] = [];
+                const val = Number(row[valueField]) || 0;
+                groups[key].push(val);
+            });
+
+            // Build chart data
+            const chartData = Object.entries(groups).map(([category, values]) => ({
+                _tree_category: category,
+                _tree_value: aggregateValues(values, aggFunc)
+            }));
+
+            // Sort by value descending
+            chartData.sort((a, b) => b._tree_value - a._tree_value);
+
+            // Render breadcrumb
+            renderChartBreadcrumb(path);
+
+            // Render chart
+            if (chartRoot) {
+                chartRoot.dispose();
+                chartRoot = null;
+            }
+
+            const container = document.getElementById('chart-container');
+            chartRoot = am5.Root.new(container);
+            chartRoot.setThemes([am5themes_Animated.new(chartRoot)]);
+
+            const chart = chartRoot.container.children.push(
+                am5xy.XYChart.new(chartRoot, {
+                    panX: true,
+                    panY: false,
+                    wheelX: 'panX',
+                    wheelY: 'zoomX',
+                    layout: chartRoot.verticalLayout
+                })
+            );
+
+            const xAxis = chart.xAxes.push(
+                am5xy.CategoryAxis.new(chartRoot, {
+                    categoryField: '_tree_category',
+                    renderer: am5xy.AxisRendererX.new(chartRoot, { minGridDistance: 30 }),
+                })
+            );
+            xAxis.data.setAll(chartData);
+
+            if (chartData.length > 10) {
+                xAxis.get('renderer').labels.template.setAll({
+                    rotation: -45,
+                    centerY: am5.p50,
+                    centerX: am5.p100,
+                    fontSize: 12
+                });
+            }
+
+            const yAxis = chart.yAxes.push(
+                am5xy.ValueAxis.new(chartRoot, {
+                    renderer: am5xy.AxisRendererY.new(chartRoot, {}),
+                })
+            );
+
+            const series = chart.series.push(
+                am5xy.ColumnSeries.new(chartRoot, {
+                    name: valueField,
+                    xAxis: xAxis,
+                    yAxis: yAxis,
+                    valueYField: '_tree_value',
+                    categoryXField: '_tree_category',
+                    tooltip: am5.Tooltip.new(chartRoot, {
+                        labelText: '{_tree_category}: {_tree_value}'
+                    }),
+                })
+            );
+            series.data.setAll(chartData);
+
+            // Color handling (from metadata)
+            if (metadata.color && !metadata.color_is_field) {
+                series.columns.template.setAll({
+                    fill: am5.color(metadata.color),
+                    stroke: am5.color(metadata.color)
+                });
+            }
+
+            // Click to drill down (if not at leaf level)
+            if (!isLeaf) {
+                series.columns.template.events.on('click', function(ev) {
+                    const dataItem = ev.target.dataItem;
+                    const category = dataItem.dataContext._tree_category;
+                    const newPath = [...path, category];
+                    renderTreeBarChart(allRows, metadata, newPath, aggFunc);
+                });
+                series.columns.template.setAll({ cursorOverStyle: 'pointer' });
+            }
+
+            series.appear(1000);
+            chart.appear(1000, 100);
+        }
+
+        function renderChartBreadcrumb(path) {
+            const bc = document.getElementById('chart-breadcrumb');
+            if (!chartTreeAllRows) {
+                bc.style.display = 'none';
+                return;
+            }
+            bc.style.display = '';
+
+            let html = '<span style="cursor:pointer;color:#4fc3f7" onclick="chartDrillTo(-1)">All</span>';
+            path.forEach((p, i) => {
+                html += ` &gt; <span style="cursor:pointer;color:#4fc3f7" onclick="chartDrillTo(${i})">${escapeHtml(String(p))}</span>`;
+            });
+            bc.innerHTML = html;
+        }
+
+        function chartDrillTo(level) {
+            chartTreePath = chartTreePath.slice(0, level + 1);
+            const meta = currentChart ? currentChart.metadata : {};
+            renderTreeBarChart(chartTreeAllRows, meta, chartTreePath, meta.tree_agg || 'sum');
+        }
+
+        // ---- End tree bar chart ----
+
+        async function handleChartClick(rowIndex) {
+            if (!chartRowData) return;
+            const { columns, rows, metadata } = chartRowData;
+            const row = rows[rowIndex];
+            if (!row || !metadata.event) return;
+
+            // Resolve target graph slug
+            let targetSlug;
+            if (metadata.event_is_field) {
+                const eventIdx = columns.indexOf(metadata.event);
+                if (eventIdx < 0) return;
+                targetSlug = String(row[eventIdx]);
+            } else {
+                targetSlug = metadata.event;
+            }
+            if (!targetSlug) return;
+
+            // Build inputs: all columns of the clicked row
+            const inputs = {};
+            for (let i = 0; i < columns.length; i++) {
+                if (row[i] != null && row[i] !== '') {
+                    inputs[columns[i]] = row[i];
+                }
+            }
+
+            // Execute the target graph
+            try {
+                showStatus(`Executing drill-down: ${targetSlug}...`, 'loading');
+                const response = await fetch(`${BASE_URL}/api/graph/${targetSlug}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inputs: inputs,
+                        apply_overrides: true,
+                        skip_unknown_inputs: true
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') {
+                    showStatus(`Drill-down error: ${result.message || result.error}`, 'error');
+                    return;
+                }
+
+                showStatus(`Drill-down executed in ${result.duration_ms}ms. Loading outputs...`, 'connected');
+                await loadDrilldownOutputs(targetSlug);
+            } catch (e) {
+                showStatus(`Drill-down error: ${e.message}`, 'error');
+            }
+        }
+
+        // ========== Drill-down ==========
+
+        function clearDrilldown() {
+            drilldownSlug = null;
+            drilldownGridOutputs = [];
+            drilldownTimelineOutputs = [];
+            drilldownDiffOutputs = [];
+            drilldownChartOutputs = [];
+            currentDrilldownOutput = null;
+            document.querySelectorAll('.drilldown-tab, .drilldown-separator').forEach(el => el.remove());
+        }
+
+        async function handleTimelineClick(itemId) {
+            if (!timelineRowData) return;
+            const { columns, rows, metadata } = timelineRowData;
+            const row = rows[itemId];
+            if (!row || !metadata.event) return;
+
+            // Resolve target graph slug
+            let targetSlug;
+            if (metadata.event_is_field) {
+                const eventIdx = columns.indexOf(metadata.event);
+                if (eventIdx < 0) return;
+                targetSlug = String(row[eventIdx]);
+            } else {
+                targetSlug = metadata.event;
+            }
+            if (!targetSlug) return;
+
+            // Build inputs: all columns of the clicked row
+            const inputs = {};
+            for (let i = 0; i < columns.length; i++) {
+                if (row[i] != null && row[i] !== '') {
+                    inputs[columns[i]] = row[i];
+                }
+            }
+
+            // Execute the target graph
+            try {
+                showStatus(`Executing drill-down: ${targetSlug}...`, 'loading');
+                const response = await fetch(`${BASE_URL}/api/graph/${targetSlug}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inputs: inputs,
+                        apply_overrides: true,
+                        skip_unknown_inputs: true
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') {
+                    showStatus(`Drill-down error: ${result.message || result.error}`, 'error');
+                    return;
+                }
+
+                showStatus(`Drill-down executed in ${result.duration_ms}ms. Loading outputs...`, 'connected');
+                await loadDrilldownOutputs(targetSlug);
+            } catch (e) {
+                showStatus(`Drill-down error: ${e.message}`, 'error');
+            }
+        }
+
+        async function loadDrilldownOutputs(slug) {
+            drilldownSlug = slug;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/outputs`);
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const allOutputs = result.outputs || [];
+                drilldownTimelineOutputs = allOutputs.filter(o => o.type === 'timeline');
+                drilldownDiffOutputs = allOutputs.filter(o => o.type === 'diff');
+                drilldownChartOutputs = allOutputs.filter(o => o.type === 'chart');
+                drilldownGridOutputs = allOutputs.filter(o => o.type !== 'timeline' && o.type !== 'diff' && o.type !== 'chart');
+
+                renderDrilldownTabs();
+
+                // Auto-select first drilldown outputs
+                if (drilldownTimelineOutputs.length > 0) {
+                    selectDrilldownTimeline(drilldownTimelineOutputs[0].name);
+                }
+                if (drilldownDiffOutputs.length > 0) {
+                    selectDrilldownDiff(drilldownDiffOutputs[0].name);
+                }
+                if (drilldownChartOutputs.length > 0) {
+                    selectDrilldownChart(drilldownChartOutputs[0].name);
+                }
+                if (drilldownGridOutputs.length > 0) {
+                    selectDrilldownOutput(drilldownGridOutputs[0].name);
+                }
+
+                const count = [];
+                if (drilldownTimelineOutputs.length > 0) count.push(`${drilldownTimelineOutputs.length} timeline(s)`);
+                if (drilldownDiffOutputs.length > 0) count.push(`${drilldownDiffOutputs.length} diff(s)`);
+                if (drilldownChartOutputs.length > 0) count.push(`${drilldownChartOutputs.length} chart(s)`);
+                if (drilldownGridOutputs.length > 0) count.push(`${drilldownGridOutputs.length} grid(s)`);
+                showStatus(`Drill-down: ${count.join(', ')} from ${slug}`, 'connected');
+            } catch (e) {
+                showStatus(`Drill-down load error: ${e.message}`, 'error');
+            }
+        }
+
+        function renderDrilldownTabs() {
+            // Remove old drilldown tabs
+            document.querySelectorAll('.drilldown-tab, .drilldown-separator').forEach(el => el.remove());
+
+            // Add drilldown timeline tabs
+            if (drilldownTimelineOutputs.length > 0) {
+                const container = document.getElementById('timeline-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownTimelineOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'timeline-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownTimeline(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+
+            // Add drilldown diff tabs
+            if (drilldownDiffOutputs.length > 0) {
+                const diffSection = document.getElementById('diff-section');
+                diffSection.style.display = '';
+                const container = document.getElementById('diff-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownDiffOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'diff-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownDiff(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+
+            // Add drilldown chart tabs
+            if (drilldownChartOutputs.length > 0) {
+                const chartSection = document.getElementById('chart-section');
+                chartSection.style.display = '';
+                const container = document.getElementById('chart-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownChartOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'chart-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownChart(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+
+            // Add drilldown grid tabs
+            if (drilldownGridOutputs.length > 0) {
+                const container = document.getElementById('output-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownGridOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'output-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownOutput(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+        }
+
+        function selectDrilldownTimeline(name) {
+            // Deactivate all timeline tabs, activate this one
+            document.querySelectorAll('.timeline-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.timeline-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            const output = drilldownTimelineOutputs.find(o => o.name === name);
+            if (output) {
+                loadTimelineData(output, drilldownSlug);
+            }
+        }
+
+        function selectDrilldownOutput(name) {
+            // Deactivate all output tabs, activate this one
+            document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.output-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            currentDrilldownOutput = drilldownGridOutputs.find(o => o.name === name);
+            if (currentDrilldownOutput) {
+                currentOutput = null; // disable primary output
+                initGrid(currentDrilldownOutput.columns);
+            }
+        }
+
+        function selectDrilldownDiff(name) {
+            document.querySelectorAll('.diff-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.diff-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            const output = drilldownDiffOutputs.find(o => o.name === name);
+            if (output) {
+                loadDiffData(output, drilldownSlug);
+            }
+        }
+
+        function selectDrilldownChart(name) {
+            document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.chart-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            const output = drilldownChartOutputs.find(o => o.name === name);
+            if (output) {
+                loadChartData(output, drilldownSlug);
+            }
+        }
+
+        // ========== Dynamic Zones ==========
+
+        async function loadDynamicZones() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}`);
+                const result = await response.json();
+
+                if (result.status !== 'ok' || !result.graph) {
+                    console.log('No graph found or error loading');
+                    return;
+                }
+
+                const graph = result.graph;
+                const zones = new Set();
+
+                if (graph.nodes) {
+                    for (const node of graph.nodes) {
+                        if (node.type === 'dynamic/dynamic_begin' && node.properties && node.properties._name) {
+                            const name = node.properties._name.value || node.properties._name;
+                            if (name) zones.add(name);
+                        }
+                    }
+                }
+
+                dynamicZones = Array.from(zones).sort();
+                renderDynamicZones();
+                await loadExistingEquations();
+
+            } catch (error) {
+                console.error('Error loading dynamic zones:', error);
+            }
+        }
+
+        async function loadExistingEquations() {
+            if (dynamicZones.length === 0) return;
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/dynamic-equations`);
+                const result = await response.json();
+
+                if (result.status !== 'ok' || !result.zones) return;
+
+                for (const zone of result.zones) {
+                    const textarea = document.getElementById(`equations-${zone._name}`);
+                    if (textarea && zone.equations && zone.equations.length > 0) {
+                        textarea.value = zone.equations.join('\n');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading existing equations:', error);
+            }
+        }
+
+        function renderDynamicZones() {
+            const container = document.getElementById('dynamic-zones');
+            const toolbar = document.getElementById('equations-toolbar');
+            const countBadge = document.getElementById('equations-count');
+
+            countBadge.textContent = dynamicZones.length;
+
+            if (dynamicZones.length === 0) {
+                container.innerHTML = '<div class="no-equations">No dynamic zones found.<br><small>Add dynamic_begin/dynamic_end nodes to your graph.</small></div>';
+                toolbar.style.display = 'none';
+                return;
+            }
+
+            toolbar.style.display = 'flex';
+
+            container.innerHTML = dynamicZones.map(zoneName => `
+                <div class="dynamic-zone" data-zone="${escapeHtml(zoneName)}">
+                    <div class="dynamic-zone-header">
+                        <span class="dynamic-zone-name">${escapeHtml(zoneName)}</span>
+                    </div>
+                    <textarea
+                        id="equations-${escapeHtml(zoneName)}"
+                        placeholder="Enter equations, one per line:&#10;D=($A+$B)*$C&#10;E=$D*42"
+                    ></textarea>
+                    <div class="hint">
+                        Syntax: <code>DEST=$FIELD1+$FIELD2*scalar</code>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getEquationsForZone(zoneName) {
+            const textarea = document.getElementById(`equations-${zoneName}`);
+            if (!textarea) return [];
+
+            return textarea.value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0 && line.includes('='));
+        }
+
+        function clearEquations() {
+            dynamicZones.forEach(zoneName => {
+                const textarea = document.getElementById(`equations-${zoneName}`);
+                if (textarea) textarea.value = '';
+            });
+        }
+
+        async function applyDynamic() {
+            const btn = document.getElementById('apply-dynamic-btn');
+            btn.disabled = true;
+            btn.textContent = 'Applying...';
+
+            try {
+                const dynamicNodes = [];
+
+                for (const zoneName of dynamicZones) {
+                    const equations = getEquationsForZone(zoneName);
+                    if (equations.length > 0) {
+                        dynamicNodes.push({
+                            _name: zoneName,
+                            params: equations
+                        });
+                    }
+                }
+
+                if (dynamicNodes.length === 0) {
+                    showStatus('No equations entered. Enter at least one equation to apply.', 'info');
+                    return;
+                }
+
+                showStatus('Applying equations to graph...', 'loading');
+
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/apply-dynamic`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dynamic_nodes: dynamicNodes })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'ok') {
+                    showStatus(`Graph updated: ${result.nodes_added} nodes added.`, 'connected');
+                    clearEquations();
+                    await loadDynamicZones();
+                } else {
+                    showStatus(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Apply';
+            }
+        }
+
+        // ========== Execute & Reload ==========
+
+        async function executeGraph() {
+            const btn = document.getElementById('execute-btn');
+            btn.disabled = true;
+            btn.textContent = 'Executing...';
+
+            try {
+                showStatus('Executing graph...', 'loading');
+
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apply_overrides: true })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'ok') {
+                    showStatus(`Graph executed in ${result.duration_ms}ms. Reloading outputs...`, 'connected');
+                    await reloadOutputs();
+                    loadParameters();
+                } else {
+                    showStatus(`Execution error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Execute';
+            }
+        }
+
+        async function reloadOutputs() {
+            const btn = document.getElementById('reload-btn');
+            btn.disabled = true;
+            clearDrilldown();
+
+            try {
+                showStatus('Loading outputs...', 'loading');
+
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/outputs`);
+                const result = await response.json();
+
+                if (result.status === 'ok') {
+                    outputs = result.outputs || [];
+                    timelineOutputs = outputs.filter(o => o.type === 'timeline');
+                    diffOutputs = outputs.filter(o => o.type === 'diff');
+                    chartOutputs = outputs.filter(o => o.type === 'chart');
+                    gridOutputs = outputs.filter(o => o.type !== 'timeline' && o.type !== 'diff' && o.type !== 'chart');
+
+                    renderTimelineTabs(timelineOutputs);
+                    renderDiffTabs(diffOutputs);
+                    renderChartTabs(chartOutputs);
+                    renderOutputTabs(gridOutputs);
+
+                    if (outputs.length === 0) {
+                        showStatus('No outputs found. Add an "output" node to your graph and execute it.', 'info');
+                        showNoOutputs();
+                    } else {
+                        const count = [];
+                        if (timelineOutputs.length > 0) count.push(`${timelineOutputs.length} timeline(s)`);
+                        if (diffOutputs.length > 0) count.push(`${diffOutputs.length} diff(s)`);
+                        if (chartOutputs.length > 0) count.push(`${chartOutputs.length} chart(s)`);
+                        if (gridOutputs.length > 0) count.push(`${gridOutputs.length} grid(s)`);
+                        showStatus(`Found ${count.join(', ')}.`, 'connected');
+
+                        if (timelineOutputs.length > 0) {
+                            selectTimeline(timelineOutputs[0].name);
+                        }
+                        if (diffOutputs.length > 0) {
+                            selectDiff(diffOutputs[0].name);
+                        }
+                        if (chartOutputs.length > 0) {
+                            selectChart(chartOutputs[0].name);
+                        }
+                        if (gridOutputs.length > 0) {
+                            selectOutput(gridOutputs[0].name);
+                        }
+                    }
+                } else {
+                    showStatus(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function showNoOutputs() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = `
+                <div class="no-outputs">
+                    <h2>No Outputs Available</h2>
+                    <p>To display data here:</p>
+                    <p>1. Add an <strong>"output"</strong> node to your graph</p>
+                    <p>2. Connect a data source to it</p>
+                    <p>3. Set the <strong>_name</strong> property</p>
+                    <p>4. Click <strong>Execute</strong> and then <strong>Reload</strong></p>
+                </div>
+            `;
+            gridApi = null;
+            document.getElementById('stats-bar').classList.add('hidden');
+        }
+
+        // ========== AG Grid ==========
+
+        function columnarToRows(columns, data) {
+            return data.map(row => {
+                const obj = {};
+                columns.forEach((col, i) => {
+                    obj[col] = row[i];
+                });
+                return obj;
+            });
+        }
+
+        function createColumnDefs(columns) {
+            return columns.map(col => ({
+                field: col,
+                headerName: col,
+                sortable: true,
+                filter: 'agTextColumnFilter',
+                filterParams: {
+                    filterOptions: ['contains', 'equals', 'notEqual', 'startsWith', 'endsWith'],
+                    defaultOption: 'contains',
+                },
+                resizable: true,
+            }));
+        }
+
+        function initGrid(columns) {
+            const gridContainer = document.getElementById('grid-container');
+            gridContainer.innerHTML = '';
+            gridApi = null;
+
+            const isTreeMode = columns.includes('__tree_path');
+            const metaColumns = ['__tree_path', '__tree_agg'];
+            const visibleColumns = isTreeMode
+                ? columns.filter(c => !metaColumns.includes(c))
+                : columns;
+
+            const columnDefs = createColumnDefs(visibleColumns);
+
+            const gridOptions = {
+                columnDefs: columnDefs,
+                defaultColDef: {
+                    flex: 1,
+                    minWidth: 100,
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                },
+                animateRows: true,
+                rowSelection: 'single',
+                suppressRowClickSelection: true,
+            };
+
+            if (isTreeMode) {
+                // Tree mode: load all data, let AG Grid Enterprise build the tree
+                loadTreeGrid(gridOptions, gridContainer, columns);
+            } else {
+                // Normal mode: server-side infinite scroll
+                gridOptions.rowModelType = 'infinite';
+                gridOptions.cacheBlockSize = PAGE_SIZE;
+                gridOptions.cacheOverflowSize = 2;
+                gridOptions.maxConcurrentDatasourceRequests = 1;
+                gridOptions.infiniteInitialRowCount = 1;
+                gridOptions.maxBlocksInCache = 10;
+                gridOptions.datasource = createDatasource();
+                gridOptions.onSortChanged = () => { if (gridApi) gridApi.purgeInfiniteCache(); };
+                gridOptions.onFilterChanged = () => { if (gridApi) gridApi.purgeInfiniteCache(); };
+
+                gridApi = agGrid.createGrid(gridContainer, gridOptions);
+            }
+        }
+
+        async function loadTreeGrid(gridOptions, gridContainer, allColumns) {
+            const activeOutput = currentDrilldownOutput || currentOutput;
+            const activeSlug = currentDrilldownOutput ? drilldownSlug : GRAPH_SLUG;
+            if (!activeOutput) return;
+
+            try {
+                showStatus('Loading tree data...', 'loading');
+
+                const response = await fetch(`${BASE_URL}/api/graph/${activeSlug}/output/${activeOutput.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 100000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') {
+                    showStatus(`Error: ${result.message}`, 'error');
+                    return;
+                }
+
+                // Extract aggFunc from __tree_agg column
+                let aggFunc = 'sum';
+                const aggIdx = result.columns.indexOf('__tree_agg');
+                if (aggIdx !== -1 && result.data.length > 0) {
+                    aggFunc = String(result.data[0][aggIdx]);
+                }
+
+                // Add aggFunc to visible column defs
+                gridOptions.columnDefs.forEach(cd => { cd.aggFunc = aggFunc; });
+
+                // Convert to row objects (include ALL columns for getDataPath)
+                const rowData = columnarToRows(result.columns, result.data);
+
+                // Tree data configuration
+                gridOptions.treeData = true;
+                gridOptions.getDataPath = (data) => JSON.parse(data.__tree_path);
+                gridOptions.autoGroupColumnDef = {
+                    headerName: 'Hierarchy',
+                    minWidth: 250,
+                    flex: 2,
+                    cellRendererParams: { suppressCount: false },
+                };
+                gridOptions.groupDefaultExpanded = 1;
+                gridOptions.suppressAggFuncInHeader = true;
+                gridOptions.rowData = rowData;
+
+                gridApi = agGrid.createGrid(gridContainer, gridOptions);
+
+                showStatus(`Tree mode - ${result.stats.total_rows} rows`, 'connected');
+                updateStats(result.stats, 1, 1);
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function buildOperations(sortModel, filterModel) {
+            const operations = [];
+
+            if (filterModel && Object.keys(filterModel).length > 0) {
+                const filterParams = [];
+                for (const [column, filter] of Object.entries(filterModel)) {
+                    if (filter.filterType === 'text') {
+                        const op = filter.type === 'contains' ? 'contains'
+                                 : filter.type === 'equals' ? '=='
+                                 : filter.type === 'notEqual' ? '!='
+                                 : filter.type === 'startsWith' ? 'contains'
+                                 : filter.type === 'endsWith' ? 'contains'
+                                 : 'contains';
+                        if (filter.filter) {
+                            filterParams.push({ column, operator: op, value: filter.filter });
+                        }
+                    } else if (filter.filterType === 'number') {
+                        const opMap = {
+                            'equals': '==', 'notEqual': '!=',
+                            'lessThan': '<', 'lessThanOrEqual': '<=',
+                            'greaterThan': '>', 'greaterThanOrEqual': '>='
+                        };
+                        const op = opMap[filter.type] || '==';
+                        if (filter.filter !== null && filter.filter !== undefined) {
+                            filterParams.push({ column, operator: op, value: filter.filter });
+                        }
+                        if (filter.type === 'inRange' && filter.filter !== null && filter.filterTo !== null) {
+                            filterParams.push({ column, operator: '>=', value: filter.filter });
+                            filterParams.push({ column, operator: '<=', value: filter.filterTo });
+                        }
+                    }
+                }
+                if (filterParams.length > 0) {
+                    operations.push({ type: 'filter', params: filterParams });
+                }
+            }
+
+            if (sortModel && sortModel.length > 0) {
+                const orderByParams = sortModel.map(sort => ({
+                    column: sort.colId,
+                    order: sort.sort
+                }));
+                operations.push({ type: 'orderby', params: orderByParams });
+            }
+
+            return operations;
+        }
+
+        function createDatasource() {
+            return {
+                getRows: async (params) => {
+                    const startRow = params.startRow;
+                    const endRow = params.endRow;
+                    const pageSize = endRow - startRow;
+
+                    // Resolve slug and output (primary or drilldown)
+                    const activeOutput = currentDrilldownOutput || currentOutput;
+                    const activeSlug = currentDrilldownOutput ? drilldownSlug : GRAPH_SLUG;
+
+                    if (!activeOutput) {
+                        params.failCallback();
+                        return;
+                    }
+
+                    try {
+                        showStatus('Loading...', 'loading');
+
+                        const operations = buildOperations(params.sortModel, params.filterModel);
+
+                        const response = await fetch(`${BASE_URL}/api/graph/${activeSlug}/output/${activeOutput.name}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                limit: pageSize,
+                                offset: startRow,
+                                operations: operations
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (result.status !== 'ok') {
+                            showStatus(`Error: ${result.message}`, 'error');
+                            params.failCallback();
+                            return;
+                        }
+
+                        const totalRows = result.stats.total_rows;
+                        const rows = columnarToRows(result.columns, result.data);
+
+                        const currentPage = Math.floor(startRow / PAGE_SIZE) + 1;
+                        const lastPage = Math.ceil(totalRows / PAGE_SIZE);
+
+                        updateStats(result.stats, currentPage, lastPage);
+                        showStatus(`Rows ${startRow + 1}-${Math.min(endRow, totalRows)} of ${totalRows.toLocaleString()}`, 'connected');
+
+                        params.successCallback(rows, totalRows);
+                    } catch (error) {
+                        showStatus(`Error: ${error.message}`, 'error');
+                        params.failCallback();
+                    }
+                }
+            };
+        }
+
+        function updateStats(stats, page, lastPage) {
+            const statsEl = document.getElementById('stats-bar');
+            statsEl.classList.remove('hidden');
+            statsEl.innerHTML = `
+                <span><strong>Total:</strong> ${stats.total_rows.toLocaleString()} rows</span>
+                <span><strong>Page:</strong> ${page}/${lastPage}</span>
+                <span><strong>Query:</strong> ${stats.duration_ms}ms</span>
+            `;
+        }
+
+        // ========== Panel Functions ==========
+
+        function initPanel() {
+            if (panelOpen) document.body.classList.add('panel-open');
+            loadParameters();
+            loadTriggers();
+        }
+
+        function togglePanel() {
+            panelOpen = !panelOpen;
+            document.body.classList.toggle('panel-open', panelOpen);
+            localStorage.setItem('viewerPanelOpen', panelOpen);
+            // Resize grid/timeline after panel animation
+            setTimeout(() => {
+                if (gridApi) gridApi.sizeColumnsToFit();
+                if (timelineInstance) timelineInstance.redraw();
+            }, 350);
+        }
+
+        function switchPanelTab(tabName) {
+            document.querySelectorAll('.panel-tab').forEach(t =>
+                t.classList.toggle('active', t.dataset.tab === tabName)
+            );
+            document.querySelectorAll('.tab-content').forEach(c =>
+                c.classList.toggle('active', c.id === `tab-${tabName}`)
+            );
+        }
+
+        // ========== Parameters ==========
+
+        async function loadParameters() {
+            try {
+                // Fetch graph (for node list and base values) and overrides in parallel
+                const [graphResp, overridesResp] = await Promise.all([
+                    fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}`, { cache: 'no-store' }),
+                    fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/parameters`, { cache: 'no-store' })
+                ]);
+                const graphResult = await graphResp.json();
+                const overridesResult = await overridesResp.json();
+
+                if (graphResult.status !== 'ok' || !graphResult.graph) { renderParameters([]); return; }
+
+                graphData = graphResult.graph;
+                const overrides = (overridesResult.status === 'ok') ? (overridesResult.parameters || {}) : {};
+                parameterNodes = [];
+
+                for (const node of (graphData.nodes || [])) {
+                    const identifier = getIdentifier(node);
+                    if (identifier) {
+                        const pType = getParamType(node.type);
+                        const override = overrides[identifier];
+
+                        let value = getValue(node);
+                        let csvData = null;
+
+                        if (override) {
+                            if (override.type === 'csv' && override.value) {
+                                csvData = override.value;
+                            } else if (override.value !== undefined) {
+                                value = override.value;
+                            }
+                        }
+
+                        const param = { node, identifier, type: pType, value };
+                        if (pType === 'csv') {
+                            param.csvData = csvData;
+                        }
+                        parameterNodes.push(param);
+                    }
+                }
+                parameterNodes.sort((a, b) => a.identifier.localeCompare(b.identifier));
+                renderParameters(parameterNodes);
+            } catch (e) {
+                console.error('Error loading parameters:', e);
+                renderParameters([]);
+            }
+        }
+
+        function getIdentifier(node) {
+            const id = node.properties?._identifier;
+            const val = typeof id === 'object' ? id.value : id;
+            return val && val.trim() !== '' ? val : null;
+        }
+
+        function getValue(node) {
+            const v = node.properties?._value;
+            return typeof v === 'object' ? v.value : v;
+        }
+
+        function getParamType(nodeType) {
+            const map = {
+                'scalar/int_value': 'int', 'scalar/double_value': 'double',
+                'scalar/string_value': 'string', 'scalar/bool_value': 'bool',
+                'scalar/date_value': 'date', 'scalar/string_as_field': 'field',
+                'scalar/string_as_fields': 'fields',
+                'scalar/csv_value': 'csv', 'data/csv_source': 'csv'
+            };
+            return map[nodeType] || 'string';
+        }
+
+        function renderParameters(params) {
+            const container = document.getElementById('parameters-list');
+            const countBadge = document.getElementById('params-count');
+
+            countBadge.textContent = params.length;
+
+            if (params.length === 0) {
+                container.innerHTML = '<div class="no-params">No parameters.<br><small>Add scalar nodes with _identifier to see them here.</small></div>';
+                return;
+            }
+
+            container.innerHTML = params.map((p, i) => `
+                <div class="param-item" id="param-${i}">
+                    <div class="param-header">
+                        <span class="param-name">${escapeHtml(p.identifier)}</span>
+                        <span class="param-type">${p.type}</span>
+                    </div>
+                    ${renderInput(p, i)}
+                    <div class="param-status" id="status-${i}"></div>
+                </div>
+            `).join('');
+        }
+
+        function renderInput(p, i) {
+            if (p.type === 'csv') return renderCsvInput(p, i);
+            if (p.type === 'fields') return renderFieldsInput(p, i);
+            if (p.type === 'bool') {
+                const checked = p.value === true || p.value === 'true';
+                return `<div class="param-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${checked ? 'checked' : ''} onchange="onParamChange(${i}, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span id="bool-label-${i}">${checked}</span>
+                </div>`;
+            }
+            if (p.type === 'int') return `<input type="number" class="param-input" value="${p.value ?? 0}" step="1" onchange="onParamChange(${i}, parseInt(this.value)||0)">`;
+            if (p.type === 'double') return `<input type="number" class="param-input" value="${p.value ?? 0}" step="any" onchange="onParamChange(${i}, parseFloat(this.value)||0)">`;
+            return `<input type="text" class="param-input" value="${escapeHtml(p.value ?? '')}" onchange="onParamChange(${i}, this.value)">`;
+        }
+
+        function escapeHtml(t) {
+            const d = document.createElement('div');
+            d.textContent = String(t ?? '');
+            return d.innerHTML;
+        }
+
+        function renderCsvInput(p, i) {
+            const csvData = p.csvData;
+            let previewHtml = '';
+            let infoHtml = '';
+            let clearBtn = '';
+
+            if (csvData && csvData.columns && csvData.data && csvData.data.length > 0) {
+                const maxRows = 10;
+                const displayRows = csvData.data.slice(0, maxRows);
+
+                const headerCells = csvData.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
+                const bodyRows = displayRows.map(row =>
+                    '<tr>' + row.map(v => `<td>${escapeHtml(String(v ?? ''))}</td>`).join('') + '</tr>'
+                ).join('');
+
+                previewHtml = `<div class="csv-preview">
+                    <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>
+                </div>`;
+
+                const total = csvData.data.length;
+                const cols = csvData.columns.length;
+                const more = total > maxRows ? ` (showing ${maxRows} of ${total})` : '';
+                infoHtml = `<div class="csv-info">${total} rows, ${cols} columns${more}</div>`;
+                clearBtn = `<button class="csv-clear-btn" onclick="onCsvClear(${i})">Clear</button>`;
+            }
+
+            return `<div class="csv-param-actions">
+                <label class="csv-upload-btn">Upload CSV
+                    <input type="file" accept=".csv,.tsv,.txt" style="display:none" onchange="onCsvUpload(${i}, this.files[0])">
+                </label>
+                ${clearBtn}
+            </div>${previewHtml}${infoHtml}`;
+        }
+
+        function renderFieldsInput(p, i) {
+            // Parse existing value (JSON array string)
+            let fields = [];
+            try {
+                const raw = p.value;
+                if (typeof raw === 'string') {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) fields = parsed;
+                }
+            } catch {}
+            if (fields.length === 0) fields = [''];
+
+            const rows = fields.map((f, fi) =>
+                `<div class="fields-row">
+                    <input type="text" value="${escapeHtml(f)}" placeholder="field name"
+                           onchange="onFieldsChange(${i})" oninput="onFieldsChange(${i})">
+                </div>`
+            ).join('');
+
+            return `<div class="fields-list" id="fields-list-${i}">${rows}</div>
+                <div class="fields-actions">
+                    <button class="fields-btn add" onclick="onFieldsAdd(${i})">+</button>
+                    <button class="fields-btn remove" onclick="onFieldsRemove(${i})">−</button>
+                </div>`;
+        }
+
+        function onFieldsAdd(i) {
+            const list = document.getElementById('fields-list-' + i);
+            if (!list) return;
+            const row = document.createElement('div');
+            row.className = 'fields-row';
+            row.innerHTML = `<input type="text" value="" placeholder="field name"
+                                    onchange="onFieldsChange(${i})" oninput="onFieldsChange(${i})">`;
+            list.appendChild(row);
+            row.querySelector('input').focus();
+            onFieldsChange(i);
+        }
+
+        function onFieldsRemove(i) {
+            const list = document.getElementById('fields-list-' + i);
+            if (!list || list.children.length <= 1) return;
+            list.removeChild(list.lastElementChild);
+            onFieldsChange(i);
+        }
+
+        function onFieldsChange(i) {
+            const list = document.getElementById('fields-list-' + i);
+            if (!list) return;
+            const inputs = list.querySelectorAll('input[type="text"]');
+            const fields = [];
+            inputs.forEach(inp => {
+                if (inp.value.trim().length > 0) fields.push(inp.value.trim());
+            });
+            const p = parameterNodes[i];
+            if (!p) return;
+            const jsonStr = JSON.stringify(fields);
+            p.value = jsonStr;
+
+            clearTimeout(saveTimers[i]);
+            setParamStatus(i, 'saving', 'Saving...');
+            saveTimers[i] = setTimeout(() => saveParameter(i, { type: 'string', value: jsonStr }), 500);
+        }
+
+        function parseCsv(text) {
+            const rows = [];
+            let current = '';
+            let inQuotes = false;
+            let row = [];
+
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        current += ch;
+                    }
+                } else if (ch === '"') {
+                    inQuotes = true;
+                } else if (ch === ',') {
+                    row.push(current.trim());
+                    current = '';
+                } else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                    row.push(current.trim());
+                    current = '';
+                    if (row.length > 0 && !(row.length === 1 && row[0] === '')) rows.push(row);
+                    row = [];
+                    if (ch === '\r') i++;
+                } else {
+                    current += ch;
+                }
+            }
+            row.push(current.trim());
+            if (row.length > 0 && !(row.length === 1 && row[0] === '')) rows.push(row);
+            return rows;
+        }
+
+        function inferColumnTypes(header, dataRows) {
+            return header.map((_, colIdx) => {
+                let allInt = true, allNum = true;
+                for (const row of dataRows) {
+                    const val = row[colIdx];
+                    if (val === undefined || val === '') continue;
+                    if (allInt && !/^-?\d+$/.test(val)) allInt = false;
+                    if (allNum && isNaN(Number(val))) allNum = false;
+                    if (!allNum) break;
+                }
+                if (allInt) return 'INT';
+                if (allNum) return 'DOUBLE';
+                return 'STRING';
+            });
+        }
+
+        function csvRowsToTypedData(dataRows, types) {
+            return dataRows.map(row =>
+                row.map((val, colIdx) => {
+                    const t = types[colIdx];
+                    if (t === 'INT') return parseInt(val, 10) || 0;
+                    if (t === 'DOUBLE') return parseFloat(val) || 0.0;
+                    return val;
+                })
+            );
+        }
+
+        async function onCsvUpload(i, file) {
+            if (!file) return;
+            const p = parameterNodes[i];
+            if (!p) return;
+
+            try {
+                const text = await file.text();
+                const rows = parseCsv(text);
+                if (rows.length < 2) {
+                    setParamStatus(i, 'error', 'CSV must have a header and at least one data row');
+                    return;
+                }
+
+                const header = rows[0];
+                const dataRows = rows.slice(1);
+                const types = inferColumnTypes(header, dataRows);
+                const typedData = csvRowsToTypedData(dataRows, types);
+                const schema = header.map((name, idx) => ({ name, type: types[idx] }));
+
+                const csvValue = { columns: header, schema, data: typedData };
+                p.csvData = csvValue;
+
+                // Re-render this parameter
+                const container = document.getElementById(`param-${i}`);
+                if (container) {
+                    container.innerHTML = `
+                        <div class="param-header">
+                            <span class="param-name">${escapeHtml(p.identifier)}</span>
+                            <span class="param-type">csv</span>
+                        </div>
+                        ${renderCsvInput(p, i)}
+                        <div class="param-status" id="status-${i}"></div>`;
+                }
+
+                setParamStatus(i, 'saving', 'Saving...');
+                await saveParameter(i, { type: 'csv', value: csvValue });
+            } catch (e) {
+                setParamStatus(i, 'error', `Upload error: ${e.message}`);
+            }
+        }
+
+        async function onCsvClear(i) {
+            const p = parameterNodes[i];
+            if (!p) return;
+
+            p.csvData = null;
+
+            const container = document.getElementById(`param-${i}`);
+            if (container) {
+                container.innerHTML = `
+                    <div class="param-header">
+                        <span class="param-name">${escapeHtml(p.identifier)}</span>
+                        <span class="param-type">csv</span>
+                    </div>
+                    ${renderCsvInput(p, i)}
+                    <div class="param-status" id="status-${i}"></div>`;
+            }
+
+            setParamStatus(i, 'saving', 'Deleting...');
+            await deleteParameter(i);
+        }
+
+        function onParamChange(i, newValue) {
+            const p = parameterNodes[i];
+            if (!p) return;
+            p.value = newValue;
+
+            if (p.type === 'bool') {
+                const label = document.getElementById(`bool-label-${i}`);
+                if (label) label.textContent = newValue;
+            }
+
+            const typeMap = { 'int': 'int', 'double': 'double', 'bool': 'bool', 'date': 'string', 'field': 'string' };
+            const vType = typeMap[p.type] || 'string';
+
+            clearTimeout(saveTimers[i]);
+            setParamStatus(i, 'saving', 'Saving...');
+            saveTimers[i] = setTimeout(() => saveParameter(i, { type: vType, value: newValue }), 500);
+        }
+
+        function setParamStatus(i, cls, text) {
+            const item = document.getElementById(`param-${i}`);
+            const status = document.getElementById(`status-${i}`);
+            if (item) item.className = `param-item ${cls}`;
+            if (status) { status.textContent = text; status.className = `param-status ${cls}`; }
+        }
+
+        async function saveParameter(i, valueObj) {
+            const p = parameterNodes[i];
+            if (!p) return;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/parameters/${encodeURIComponent(p.identifier)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(valueObj)
+                });
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    setParamStatus(i, 'saved', 'Saved');
+                    setTimeout(() => setParamStatus(i, '', ''), 2000);
+                } else throw new Error(result.message);
+            } catch (e) {
+                setParamStatus(i, 'error', `Error: ${e.message}`);
+            }
+        }
+
+        async function deleteParameter(i) {
+            const p = parameterNodes[i];
+            if (!p) return;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/parameters/${encodeURIComponent(p.identifier)}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    setParamStatus(i, 'saved', 'Cleared');
+                    setTimeout(() => setParamStatus(i, '', ''), 2000);
+                } else throw new Error(result.message);
+            } catch (e) {
+                setParamStatus(i, 'error', `Error: ${e.message}`);
+            }
+        }
+
+        // ========== Triggers ==========
+
+        let availableListeners = [];
+        let configuredTriggers = [];
+        let csvSourceIdentifiers = [];  // _identifier values from csv_source nodes
+        const triggerSaveTimers = {};
+
+        async function loadTriggers() {
+            try {
+                // Load available listener types
+                const listenersResp = await fetch(`${BASE_URL}/api/pg-listeners`);
+                const listenersResult = await listenersResp.json();
+                availableListeners = listenersResult.status === 'ok' ? listenersResult.listeners : [];
+
+                // Load configured triggers for this graph
+                const triggersResp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/pg-triggers`);
+                const triggersResult = await triggersResp.json();
+                configuredTriggers = triggersResult.status === 'ok' ? triggersResult.triggers : [];
+
+                // Load csv_source identifiers from graph
+                const graphResp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}`);
+                const graphResult = await graphResp.json();
+                csvSourceIdentifiers = [];
+                if (graphResult.status === 'ok' && graphResult.graph) {
+                    for (const node of (graphResult.graph.nodes || [])) {
+                        if (node.type === 'data/csv_source') {
+                            const id = getIdentifier(node);
+                            if (id) csvSourceIdentifiers.push(id);
+                        }
+                    }
+                    csvSourceIdentifiers.sort();
+                }
+
+                renderTriggers();
+            } catch (e) {
+                console.error('Error loading triggers:', e);
+                renderTriggers();
+            }
+        }
+
+        function renderTriggers() {
+            const container = document.getElementById('triggers-list');
+            const countBadge = document.getElementById('triggers-count');
+            countBadge.textContent = configuredTriggers.length;
+
+            if (configuredTriggers.length === 0) {
+                container.innerHTML = '<div class="no-triggers">No triggers configured. Click "+ Add Trigger" below.</div>';
+                return;
+            }
+
+            container.innerHTML = configuredTriggers.map((trigger, idx) => {
+                const listenerDef = availableListeners.find(l => l.type === trigger.trigger_type);
+                const label = listenerDef ? listenerDef.label : trigger.trigger_type;
+                const outputFields = listenerDef ? listenerDef.output_fields : [];
+                const selectedId = trigger.identifier || '';
+
+                const options = ['<option value="">(not mapped)</option>']
+                    .concat(csvSourceIdentifiers.map(id =>
+                        `<option value="${escapeHtml(id)}" ${id === selectedId ? 'selected' : ''}>${escapeHtml(id)}</option>`
+                    )).join('');
+
+                return `<div class="trigger-item" id="trigger-${idx}">
+                    <div class="trigger-item-header">
+                        <span class="trigger-type-label">${escapeHtml(label)}</span>
+                        <div class="trigger-toggle">
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${trigger.is_enabled ? 'checked' : ''}
+                                       onchange="onTriggerToggle(${idx}, this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="trigger-fields-info">Columns: ${outputFields.map(f => escapeHtml(f)).join(', ')}</div>
+                    <div class="trigger-csv-target">
+                        <label>CSV source node:</label>
+                        <select onchange="onTriggerIdentifierChange(${idx}, this.value)">
+                            ${options}
+                        </select>
+                    </div>
+                    <div class="trigger-actions">
+                        <button onclick="deleteTrigger(${idx})">Delete</button>
+                    </div>
+                    <div class="trigger-status" id="trigger-status-${idx}"></div>
+                </div>`;
+            }).join('');
+        }
+
+        function onTriggerIdentifierChange(idx, identifier) {
+            const trigger = configuredTriggers[idx];
+            if (!trigger) return;
+            trigger.identifier = identifier;
+
+            clearTimeout(triggerSaveTimers[idx]);
+            setTriggerStatus(idx, 'saving', 'Saving...');
+            triggerSaveTimers[idx] = setTimeout(() => saveTrigger(idx), 500);
+        }
+
+        function onTriggerToggle(idx, enabled) {
+            const trigger = configuredTriggers[idx];
+            if (!trigger) return;
+            trigger.is_enabled = enabled;
+
+            clearTimeout(triggerSaveTimers[idx]);
+            setTriggerStatus(idx, 'saving', 'Saving...');
+            triggerSaveTimers[idx] = setTimeout(() => saveTrigger(idx), 300);
+        }
+
+        async function saveTrigger(idx) {
+            const trigger = configuredTriggers[idx];
+            if (!trigger) return;
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/pg-triggers/${trigger.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        is_enabled: trigger.is_enabled,
+                        identifier: trigger.identifier || ''
+                    })
+                });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    setTriggerStatus(idx, 'saved', 'Saved');
+                    setTimeout(() => setTriggerStatus(idx, '', ''), 2000);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (e) {
+                setTriggerStatus(idx, 'error', `Error: ${e.message}`);
+            }
+        }
+
+        async function deleteTrigger(idx) {
+            const trigger = configuredTriggers[idx];
+            if (!trigger) return;
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/pg-triggers/${trigger.id}`, {
+                    method: 'DELETE'
+                });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    configuredTriggers.splice(idx, 1);
+                    renderTriggers();
+                }
+            } catch (e) {
+                console.error('Error deleting trigger:', e);
+            }
+        }
+
+        function setTriggerStatus(idx, cls, text) {
+            const el = document.getElementById(`trigger-status-${idx}`);
+            if (el) { el.textContent = text; el.className = `trigger-status ${cls}`; }
+        }
+
+        function openAddTriggerDropdown(btn) {
+            const dropdown = document.getElementById('add-trigger-dropdown');
+            if (dropdown.style.display !== 'none') {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            // Filter out already-configured types
+            const usedTypes = configuredTriggers.map(t => t.trigger_type);
+            const available = availableListeners.filter(l => !usedTypes.includes(l.type));
+
+            if (available.length === 0) {
+                dropdown.innerHTML = '<div class="trigger-dropdown-item"><div class="desc">All trigger types are already configured</div></div>';
+            } else {
+                dropdown.innerHTML = available.map(l =>
+                    `<div class="trigger-dropdown-item" onclick="addTrigger('${escapeHtml(l.type)}')">
+                        <div class="name">${escapeHtml(l.label)}</div>
+                        <div class="desc">${escapeHtml(l.description)}</div>
+                    </div>`
+                ).join('');
+            }
+
+            dropdown.style.display = 'block';
+
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', function closeDropdown(e) {
+                    if (!dropdown.contains(e.target) && e.target !== btn) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeDropdown);
+                    }
+                });
+            }, 0);
+        }
+
+        async function addTrigger(triggerType) {
+            document.getElementById('add-trigger-dropdown').style.display = 'none';
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/pg-triggers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trigger_type: triggerType,
+                        identifier: '',
+                        is_enabled: true
+                    })
+                });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    await loadTriggers();
+                } else {
+                    console.error('Error creating trigger:', result.message);
+                }
+            } catch (e) {
+                console.error('Error creating trigger:', e);
+            }
+        }
+
+        // ========== Scenarios ==========
+
+        let scenarioModeActive = false;
+        let scenarioList = [];
+        let editingScenarioId = null;
+        let editorInputValues = {};
+        let editorExpectedOutputs = [];
+        let editorTriggers = [];
+
+        function toggleScenarioMode() {
+            scenarioModeActive = !scenarioModeActive;
+            const btn = document.getElementById('scenario-btn');
+            const contentArea = document.querySelector('.content-area');
+            const scenarioMode = document.getElementById('scenario-mode');
+
+            btn.classList.toggle('active', scenarioModeActive);
+
+            if (scenarioModeActive) {
+                contentArea.style.display = 'none';
+                scenarioMode.classList.add('visible');
+                loadScenarios();
+            } else {
+                contentArea.style.display = '';
+                scenarioMode.classList.remove('visible');
+            }
+        }
+
+        async function loadScenarios() {
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios`);
+                const result = await resp.json();
+                scenarioList = result.status === 'ok' ? result.scenarios : [];
+                renderScenarioList();
+            } catch (e) {
+                console.error('Error loading scenarios:', e);
+                scenarioList = [];
+                renderScenarioList();
+            }
+        }
+
+        function renderScenarioList() {
+            const container = document.getElementById('scenario-list');
+            if (scenarioList.length === 0) {
+                container.innerHTML = '<div class="no-scenarios">No scenarios yet. Click "+ New Scenario" to create one.</div>';
+                return;
+            }
+
+            container.innerHTML = scenarioList.map(s => {
+                const badgeClass = s.last_run_status === 'pass' ? 'pass'
+                    : s.last_run_status === 'fail' ? 'fail' : 'not-run';
+                const badgeText = s.last_run_status === 'pass' ? 'PASS'
+                    : s.last_run_status === 'fail' ? 'FAIL' : 'Not run';
+                const lastRun = s.last_run_at
+                    ? new Date(s.last_run_at).toLocaleString()
+                    : 'Never';
+
+                return `<div class="scenario-card" onclick="openScenarioEditor(${s.id})">
+                    <div class="scenario-card-left">
+                        <div class="scenario-card-name">${escapeHtml(s.name)}</div>
+                        <div class="scenario-card-meta">Last run: ${lastRun}</div>
+                    </div>
+                    <div class="scenario-card-right">
+                        <span class="scenario-badge ${badgeClass}">${badgeText}</span>
+                        <div class="scenario-card-actions" onclick="event.stopPropagation()">
+                            <button class="run-btn" onclick="runSingleScenario(${s.id})">Run</button>
+                            <button class="del-btn" onclick="deleteScenario(${s.id})">Del</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function createScenario() {
+            const name = prompt('Scenario name:');
+            if (!name || !name.trim()) return;
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim() })
+                });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    await loadScenarios();
+                    openScenarioEditor(result.id);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteScenario(id) {
+            if (!confirm('Delete this scenario?')) return;
+            try {
+                await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/${id}`, { method: 'DELETE' });
+                await loadScenarios();
+            } catch (e) { console.error(e); }
+        }
+
+        async function runSingleScenario(id) {
+            try {
+                showStatus('Running scenario...', 'loading');
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/${id}/run`, { method: 'POST' });
+                const result = await resp.json();
+                showStatus(`Scenario: ${result.run_status === 'pass' ? 'PASS' : 'FAIL'}`, result.run_status === 'pass' ? 'connected' : 'error');
+                await loadScenarios();
+            } catch (e) {
+                showStatus(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function runAllScenarios() {
+            const btn = document.getElementById('run-all-btn');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+            try {
+                showStatus('Running all scenarios...', 'loading');
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/run-all`, { method: 'POST' });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    const s = result.summary;
+                    showStatus(`All scenarios: ${s.pass} pass, ${s.fail} fail out of ${s.total}`, s.fail === 0 ? 'connected' : 'error');
+                }
+                await loadScenarios();
+            } catch (e) {
+                showStatus(`Error: ${e.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run All';
+            }
+        }
+
+        // ========== Scenario Editor ==========
+
+        async function openScenarioEditor(id) {
+            editingScenarioId = id;
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/${id}`);
+                const result = await resp.json();
+                if (result.status !== 'ok') return;
+
+                document.getElementById('editor-name').value = result.scenario.name;
+                document.getElementById('editor-description').value = result.scenario.description || '';
+                document.getElementById('editor-title').textContent = 'Edit Scenario: ' + result.scenario.name;
+
+                // Populate input overrides
+                editorInputValues = {};
+                for (const inp of (result.inputs || [])) {
+                    editorInputValues[inp.identifier] = inp.value_json;
+                }
+                renderEditorInputs();
+
+                // Populate expected outputs
+                editorExpectedOutputs = (result.expected_outputs || []).map(e => ({
+                    outputName: e.output_name,
+                    expectedJson: e.expected_json
+                }));
+                renderEditorExpected();
+
+                // Populate triggers
+                editorTriggers = (result.triggers || []).map(t => ({
+                    triggerType: t.trigger_type,
+                    identifier: t.identifier,
+                    dataJson: t.data_json
+                }));
+                renderEditorTriggers();
+
+                // Clear previous results
+                document.getElementById('editor-run-results').innerHTML = '';
+
+                document.getElementById('scenario-editor-overlay').classList.add('visible');
+            } catch (e) { console.error(e); }
+        }
+
+        function closeScenarioEditor() {
+            document.getElementById('scenario-editor-overlay').classList.remove('visible');
+            editingScenarioId = null;
+        }
+
+        function renderEditorInputs() {
+            const container = document.getElementById('editor-inputs');
+
+            // Use parameterNodes from the existing parameters system
+            const scalarParams = parameterNodes.filter(p => p.type !== 'csv');
+
+            if (scalarParams.length === 0) {
+                container.innerHTML = '<div style="color:#6c757d;font-style:italic;font-size:13px;">No scalar parameters in this graph.</div>';
+                return;
+            }
+
+            container.innerHTML = scalarParams.map(p => {
+                const currentVal = editorInputValues[p.identifier];
+                let displayVal = '';
+                if (currentVal !== undefined) {
+                    try { displayVal = JSON.parse(currentVal); } catch { displayVal = currentVal; }
+                } else {
+                    displayVal = p.value ?? '';
+                }
+
+                return `<div class="editor-input-row">
+                    <span class="input-id">${escapeHtml(p.identifier)}</span>
+                    <span class="input-type">${p.type}</span>
+                    <input type="${p.type === 'int' || p.type === 'double' ? 'number' : 'text'}"
+                           value="${escapeHtml(String(displayVal))}"
+                           ${p.type === 'int' ? 'step="1"' : p.type === 'double' ? 'step="any"' : ''}
+                           data-identifier="${escapeHtml(p.identifier)}"
+                           data-type="${p.type}"
+                           onchange="onEditorInputChange(this)">
+                </div>`;
+            }).join('');
+        }
+
+        function onEditorInputChange(el) {
+            const id = el.dataset.identifier;
+            const type = el.dataset.type;
+            let val;
+            if (type === 'int') val = parseInt(el.value) || 0;
+            else if (type === 'double') val = parseFloat(el.value) || 0;
+            else if (type === 'bool') val = el.value === 'true';
+            else val = el.value;
+            editorInputValues[id] = JSON.stringify(val);
+        }
+
+        function renderEditorExpected() {
+            const container = document.getElementById('editor-expected');
+            if (editorExpectedOutputs.length === 0) {
+                container.innerHTML = '<div style="color:#6c757d;font-style:italic;font-size:13px;">No expected outputs. Use "Capture from Last Execution" or upload CSV.</div>';
+                return;
+            }
+
+            container.innerHTML = editorExpectedOutputs.map((exp, idx) => {
+                let previewHtml = '';
+                try {
+                    const dfJson = JSON.parse(exp.expectedJson);
+                    if (dfJson.columns && dfJson.data) {
+                        const maxRows = 5;
+                        const displayRows = dfJson.data.slice(0, maxRows);
+                        const headerCells = dfJson.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
+                        const bodyRows = displayRows.map(row =>
+                            '<tr>' + row.map(v => `<td>${escapeHtml(String(v ?? ''))}</td>`).join('') + '</tr>'
+                        ).join('');
+                        previewHtml = `<div class="csv-preview" style="max-height:160px;">
+                            <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>
+                        </div>
+                        <div class="csv-info">${dfJson.data.length} rows, ${dfJson.columns.length} columns</div>`;
+                    }
+                } catch {}
+
+                return `<div class="editor-expected-item">
+                    <div class="editor-expected-header">
+                        <span class="editor-expected-name">${escapeHtml(exp.outputName)}</span>
+                        <div class="editor-expected-actions">
+                            <label style="padding:2px 8px;border:1px solid #007bff;color:#007bff;background:white;border-radius:3px;font-size:11px;cursor:pointer;">Upload CSV
+                                <input type="file" accept=".csv" style="display:none" onchange="uploadExpectedCsv(${idx}, this.files[0])">
+                            </label>
+                            <button onclick="removeExpectedOutput(${idx})">Remove</button>
+                        </div>
+                    </div>
+                    ${previewHtml}
+                </div>`;
+            }).join('');
+        }
+
+        async function captureExpectedOutputs() {
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/outputs`);
+                const result = await resp.json();
+                if (result.status !== 'ok' || !result.outputs || result.outputs.length === 0) {
+                    alert('No outputs available. Execute the graph first.');
+                    return;
+                }
+
+                editorExpectedOutputs = [];
+
+                for (const output of result.outputs) {
+                    const dfResp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/output/${output.name}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ limit: 10000, offset: 0 })
+                    });
+                    const dfResult = await dfResp.json();
+                    if (dfResult.status === 'ok') {
+                        const schema = dfResult.columns.map(c => ({ name: c, type: 'STRING' }));
+                        // Infer types from data
+                        if (dfResult.data && dfResult.data.length > 0) {
+                            for (let ci = 0; ci < dfResult.columns.length; ci++) {
+                                const first = dfResult.data[0][ci];
+                                if (typeof first === 'number') {
+                                    schema[ci].type = Number.isInteger(first) ? 'INT' : 'DOUBLE';
+                                }
+                            }
+                        }
+                        editorExpectedOutputs.push({
+                            outputName: output.name,
+                            expectedJson: JSON.stringify({
+                                columns: dfResult.columns,
+                                schema: schema,
+                                data: dfResult.data
+                            })
+                        });
+                    }
+                }
+
+                renderEditorExpected();
+            } catch (e) {
+                console.error('Error capturing outputs:', e);
+                alert('Error capturing outputs: ' + e.message);
+            }
+        }
+
+        async function uploadExpectedCsv(idx, file) {
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const rows = parseCsv(text);
+                if (rows.length < 2) { alert('CSV must have header + data'); return; }
+
+                const header = rows[0];
+                const dataRows = rows.slice(1);
+                const types = inferColumnTypes(header, dataRows);
+                const typedData = csvRowsToTypedData(dataRows, types);
+                const schema = header.map((name, idx2) => ({ name, type: types[idx2] }));
+
+                editorExpectedOutputs[idx].expectedJson = JSON.stringify({
+                    columns: header, schema, data: typedData
+                });
+                renderEditorExpected();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        function removeExpectedOutput(idx) {
+            editorExpectedOutputs.splice(idx, 1);
+            renderEditorExpected();
+        }
+
+        function renderEditorTriggers() {
+            const container = document.getElementById('editor-triggers');
+
+            // Show available trigger types from configuredTriggers + add button
+            const usedTypes = editorTriggers.map(t => t.triggerType);
+
+            let html = '';
+
+            for (let idx = 0; idx < editorTriggers.length; idx++) {
+                const trig = editorTriggers[idx];
+                const listenerDef = availableListeners.find(l => l.type === trig.triggerType);
+                const label = listenerDef ? listenerDef.label : trig.triggerType;
+
+                let previewHtml = '';
+                if (trig.dataJson) {
+                    try {
+                        const dfJson = JSON.parse(trig.dataJson);
+                        if (dfJson.columns && dfJson.data) {
+                            const maxRows = 3;
+                            const displayRows = dfJson.data.slice(0, maxRows);
+                            const headerCells = dfJson.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('');
+                            const bodyRows = displayRows.map(row =>
+                                '<tr>' + row.map(v => `<td>${escapeHtml(String(v ?? ''))}</td>`).join('') + '</tr>'
+                            ).join('');
+                            previewHtml = `<div class="csv-preview" style="max-height:120px;">
+                                <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>
+                            </div>
+                            <div class="csv-info">${dfJson.data.length} rows</div>`;
+                        }
+                    } catch {}
+                }
+
+                const idOptions = ['<option value="">(select)</option>']
+                    .concat(csvSourceIdentifiers.map(id =>
+                        `<option value="${escapeHtml(id)}" ${id === trig.identifier ? 'selected' : ''}>${escapeHtml(id)}</option>`
+                    )).join('');
+
+                html += `<div class="editor-trigger-item">
+                    <div class="editor-trigger-header">
+                        <span class="editor-trigger-type">${escapeHtml(label)}</span>
+                        <select onchange="editorTriggers[${idx}].identifier=this.value" style="font-size:12px;padding:2px 6px;">${idOptions}</select>
+                        <label class="csv-upload-btn" style="font-size:11px;padding:3px 8px;">Upload CSV
+                            <input type="file" accept=".csv" style="display:none" onchange="uploadTriggerCsv(${idx}, this.files[0])">
+                        </label>
+                        <button style="background:none;border:1px solid #dc3545;color:#dc3545;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
+                                onclick="editorTriggers.splice(${idx},1);renderEditorTriggers();">Remove</button>
+                    </div>
+                    ${previewHtml}
+                </div>`;
+            }
+
+            // Add trigger button
+            const availableTypes = availableListeners.filter(l => !usedTypes.includes(l.type));
+            if (availableTypes.length > 0) {
+                html += `<div style="margin-top:8px;">
+                    <select id="add-trigger-type-select" style="font-size:12px;padding:4px 8px;border:1px solid #dee2e6;border-radius:4px;">
+                        ${availableTypes.map(l => `<option value="${escapeHtml(l.type)}">${escapeHtml(l.label)}</option>`).join('')}
+                    </select>
+                    <button class="btn secondary" style="font-size:12px;padding:4px 10px;margin-left:6px;"
+                            onclick="addEditorTrigger()">+ Add Trigger</button>
+                </div>`;
+            }
+
+            container.innerHTML = html || '<div style="color:#6c757d;font-style:italic;font-size:13px;">No trigger simulation.</div>';
+        }
+
+        function addEditorTrigger() {
+            const sel = document.getElementById('add-trigger-type-select');
+            if (!sel) return;
+            editorTriggers.push({
+                triggerType: sel.value,
+                identifier: '',
+                dataJson: ''
+            });
+            renderEditorTriggers();
+        }
+
+        async function uploadTriggerCsv(idx, file) {
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const rows = parseCsv(text);
+                if (rows.length < 2) { alert('CSV must have header + data'); return; }
+
+                const header = rows[0];
+                const dataRows = rows.slice(1);
+                const types = inferColumnTypes(header, dataRows);
+                const typedData = csvRowsToTypedData(dataRows, types);
+                const schema = header.map((name, idx2) => ({ name, type: types[idx2] }));
+
+                editorTriggers[idx].dataJson = JSON.stringify({
+                    columns: header, schema, data: typedData
+                });
+                renderEditorTriggers();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        function gatherEditorData() {
+            const name = document.getElementById('editor-name').value.trim();
+            const description = document.getElementById('editor-description').value.trim();
+
+            // Gather all input values from editor (including unchanged ones)
+            document.querySelectorAll('#editor-inputs .editor-input-row input').forEach(el => {
+                onEditorInputChange(el);
+            });
+
+            const inputs = Object.entries(editorInputValues).map(([identifier, valueJson]) => ({
+                identifier,
+                value_json: valueJson
+            }));
+
+            const expected_outputs = editorExpectedOutputs.map(e => ({
+                output_name: e.outputName,
+                expected_json: e.expectedJson
+            }));
+
+            const triggers = editorTriggers.filter(t => t.identifier && t.dataJson).map(t => ({
+                trigger_type: t.triggerType,
+                identifier: t.identifier,
+                data_json: t.dataJson
+            }));
+
+            return { name, description, inputs, expected_outputs, triggers };
+        }
+
+        async function saveScenario() {
+            if (!editingScenarioId) return;
+            const data = gatherEditorData();
+            if (!data.name) { alert('Name is required'); return; }
+
+            try {
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/${editingScenarioId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                if (result.status === 'ok') {
+                    await loadScenarios();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveAndRunScenario() {
+            await saveScenario();
+            if (!editingScenarioId) return;
+
+            try {
+                document.getElementById('editor-run-results').innerHTML = '<div style="padding:10px;color:#6c757d;">Running...</div>';
+
+                const resp = await fetch(`${BASE_URL}/api/graph/${GRAPH_SLUG}/scenarios/${editingScenarioId}/run`, { method: 'POST' });
+                const result = await resp.json();
+
+                renderRunResults(result);
+                await loadScenarios();
+            } catch (e) {
+                document.getElementById('editor-run-results').innerHTML = `<div style="padding:10px;color:#dc3545;">Error: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderRunResults(result) {
+            const container = document.getElementById('editor-run-results');
+            const isPass = result.run_status === 'pass';
+
+            let html = `<div class="run-results">
+                <div class="run-results-header ${isPass ? 'pass' : 'fail'}">
+                    ${isPass ? 'PASS' : 'FAIL'}
+                    ${result.duration_ms ? ` (${result.duration_ms}ms)` : ''}
+                    ${result.error ? ` - ${escapeHtml(result.error)}` : ''}
+                </div>`;
+
+            for (const output of (result.outputs || [])) {
+                if (output.match) {
+                    html += `<div class="run-result-item match">&#10003; ${escapeHtml(output.output_name)}</div>`;
+                } else {
+                    html += `<div class="run-result-item mismatch">&#10007; ${escapeHtml(output.output_name)}`;
+                    if (output.error) {
+                        html += ` - ${escapeHtml(output.error)}`;
+                    }
+                    if (output.mismatches) {
+                        const toShow = output.mismatches.slice(0, 10);
+                        for (const m of toShow) {
+                            if (m.type === 'missing_column') {
+                                html += `<div class="mismatch-detail">Missing column: ${escapeHtml(m.column)}</div>`;
+                            } else if (m.type === 'extra_column') {
+                                html += `<div class="mismatch-detail">Extra column: ${escapeHtml(m.column)}</div>`;
+                            } else if (m.type === 'row_count') {
+                                html += `<div class="mismatch-detail">Row count: expected ${m.expected}, got ${m.actual}</div>`;
+                            } else if (m.type === 'cell') {
+                                html += `<div class="mismatch-detail">Row ${m.row}, col "${escapeHtml(m.column)}": expected ${JSON.stringify(m.expected)}, got ${JSON.stringify(m.actual)}</div>`;
+                            }
+                        }
+                        if (output.mismatches.length > 10) {
+                            html += `<div class="mismatch-detail">... and ${output.mismatches.length - 10} more</div>`;
+                        }
+                    }
+                    html += `</div>`;
+                }
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        // ========== Diff Output ==========
+
+        function renderDiffTabs(diffs) {
+            const section = document.getElementById('diff-section');
+            const container = document.getElementById('diff-tabs');
+
+            if (diffs.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            container.innerHTML = diffs.map((o, i) => `
+                <button class="diff-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectDiff('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectDiff(outputName) {
+            document.querySelectorAll('.diff-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === outputName);
+            });
+
+            currentDiff = diffOutputs.find(o => o.name === outputName);
+            if (currentDiff) {
+                loadDiffData(currentDiff);
+            }
+        }
+
+        async function loadDiffData(output, slug) {
+            slug = slug || GRAPH_SLUG;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/output/${output.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 10000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const columns = result.columns;
+                const rows = result.data;
+                const meta = output.metadata || {};
+
+                // Identify column groups
+                const diffIdx = columns.indexOf('__diff__');
+                let allCols = (meta.all_columns || []);
+
+                // Fallback: derive allCols from raw columns if metadata is missing
+                if (allCols.length === 0) {
+                    allCols = columns.filter(c =>
+                        c !== '__diff__' && !c.startsWith('__old_') && !c.startsWith('__changed_')
+                    );
+                }
+
+
+                // Build left rows (old values) and right rows (new values)
+                const leftRows = [];
+                const rightRows = [];
+                const diffStatuses = [];
+
+                for (const row of rows) {
+                    const diffStatus = diffIdx >= 0 ? row[diffIdx] : 'unchanged';
+                    diffStatuses.push(diffStatus);
+
+                    // Right row: read regular column values
+                    const rightRow = { __diff__: diffStatus };
+                    for (const col of allCols) {
+                        const idx = columns.indexOf(col);
+                        rightRow[col] = idx >= 0 ? row[idx] : '';
+                        // Read changed flag
+                        const changedIdx = columns.indexOf('__changed_' + col);
+                        rightRow['__changed_' + col] = changedIdx >= 0 ? row[changedIdx] : 0;
+                    }
+                    rightRows.push(rightRow);
+
+                    // Left row: read __old_* column values
+                    const leftRow = { __diff__: diffStatus };
+                    for (const col of allCols) {
+                        const oldIdx = columns.indexOf('__old_' + col);
+                        leftRow[col] = oldIdx >= 0 ? row[oldIdx] : '';
+                    }
+                    leftRows.push(leftRow);
+                }
+
+                renderDiffGrids(allCols, leftRows, rightRows, meta);
+            } catch (e) {
+                console.error('Diff load error:', e);
+            }
+        }
+
+        function renderDiffGrids(allCols, leftRows, rightRows, meta) {
+            // Update stats
+            const stats = meta.stats || {};
+            const statsEl = document.getElementById('diff-stats');
+            statsEl.innerHTML = `
+                <span class="stat-added">+${stats.added || 0} added</span>
+                <span class="stat-removed">-${stats.removed || 0} removed</span>
+                <span class="stat-modified">~${stats.modified || 0} modified</span>
+                <span class="stat-unchanged">${stats.unchanged || 0} unchanged</span>
+            `;
+
+            // Column definitions (same for both grids, fixed widths for alignment)
+            const colWidth = 150;
+            const colDefs = allCols.map(col => ({
+                field: col,
+                headerName: col,
+                width: colWidth,
+                minWidth: 80,
+                suppressSizeToFit: true,
+                sortable: false,
+                filter: false,
+                resizable: true
+            }));
+
+            // Row class rules for coloring
+            const rowClassRules = {
+                'diff-row-added': params => params.data && params.data.__diff__ === 'added',
+                'diff-row-removed': params => params.data && params.data.__diff__ === 'removed',
+                'diff-row-modified': params => params.data && params.data.__diff__ === 'modified',
+            };
+
+            // Right grid: add cell class rules for changed cells
+            const rightColDefs = allCols.map(col => ({
+                field: col,
+                headerName: col,
+                width: colWidth,
+                minWidth: 80,
+                suppressSizeToFit: true,
+                sortable: false,
+                filter: false,
+                resizable: true,
+                cellClassRules: {
+                    'diff-cell-changed': params => params.data && params.data['__changed_' + col] === 1
+                }
+            }));
+
+            // Destroy existing grids
+            if (diffGridLeftApi) { diffGridLeftApi.destroy(); diffGridLeftApi = null; }
+            if (diffGridRightApi) { diffGridRightApi.destroy(); diffGridRightApi = null; }
+
+            const leftContainer = document.getElementById('diff-grid-left');
+            const rightContainer = document.getElementById('diff-grid-right');
+            leftContainer.innerHTML = '';
+            rightContainer.innerHTML = '';
+
+            // Store all rows for filtering
+            const allLeftRows = leftRows;
+            const allRightRows = rightRows;
+
+            // Filter based on unchanged toggle
+            const filterRows = (rows) => {
+                if (diffShowUnchanged) return rows;
+                return rows.filter(r => r.__diff__ !== 'unchanged');
+            };
+
+            // External filter for AG Grid
+            const isExternalFilterPresent = () => !diffShowUnchanged;
+            const doesExternalFilterPass = (node) => node.data.__diff__ !== 'unchanged';
+
+            // Left grid
+            const leftGridOptions = {
+                columnDefs: colDefs,
+                rowData: filterRows(allLeftRows),
+                rowClassRules: rowClassRules,
+                suppressHorizontalScroll: false,
+                suppressMovableColumns: true,
+                headerHeight: 32,
+                rowHeight: 28,
+                isExternalFilterPresent: isExternalFilterPresent,
+                doesExternalFilterPass: doesExternalFilterPass,
+                onBodyScroll: (event) => syncDiffScroll(event, 'left'),
+                onColumnResized: (event) => syncDiffColumnResize(event, 'left'),
+            };
+
+            // Right grid
+            const rightGridOptions = {
+                columnDefs: rightColDefs,
+                rowData: filterRows(allRightRows),
+                rowClassRules: rowClassRules,
+                suppressHorizontalScroll: false,
+                suppressMovableColumns: true,
+                headerHeight: 32,
+                rowHeight: 28,
+                isExternalFilterPresent: isExternalFilterPresent,
+                doesExternalFilterPass: doesExternalFilterPass,
+                onBodyScroll: (event) => syncDiffScroll(event, 'right'),
+                onColumnResized: (event) => syncDiffColumnResize(event, 'right'),
+            };
+
+            diffGridLeftApi = agGrid.createGrid(leftContainer, leftGridOptions);
+            diffGridRightApi = agGrid.createGrid(rightContainer, rightGridOptions);
+
+            // Store row data for re-filtering
+            leftContainer._allRows = allLeftRows;
+            rightContainer._allRows = allRightRows;
+
+            // Reset unchanged checkbox
+            document.getElementById('diff-show-unchanged').checked = diffShowUnchanged;
+        }
+
+        // Scroll synchronization
+        let _diffSyncingScroll = false;
+
+        function syncDiffScroll(event, source) {
+            if (_diffSyncingScroll) return;
+            _diffSyncingScroll = true;
+
+            requestAnimationFrame(() => {
+                const sourceContainer = source === 'left'
+                    ? document.getElementById('diff-grid-left')
+                    : document.getElementById('diff-grid-right');
+                const targetContainer = source === 'left'
+                    ? document.getElementById('diff-grid-right')
+                    : document.getElementById('diff-grid-left');
+
+                const sourceViewport = sourceContainer.querySelector('.ag-body-viewport');
+                const targetViewport = targetContainer.querySelector('.ag-body-viewport');
+
+                if (sourceViewport && targetViewport) {
+                    targetViewport.scrollTop = sourceViewport.scrollTop;
+                    targetViewport.scrollLeft = sourceViewport.scrollLeft;
+                }
+
+                _diffSyncingScroll = false;
+            });
+        }
+
+        function syncDiffColumnResize(event, source) {
+            if (!event.column || event.finished !== true) return;
+            const colId = event.column.getColId();
+            const newWidth = event.column.getActualWidth();
+
+            const targetApi = source === 'left' ? diffGridRightApi : diffGridLeftApi;
+            if (targetApi) {
+                targetApi.setColumnWidths([{ key: colId, newWidth: newWidth }]);
+            }
+        }
+
+        function toggleDiffUnchanged(show) {
+            diffShowUnchanged = show;
+
+            // Re-set row data with filter applied
+            const leftContainer = document.getElementById('diff-grid-left');
+            const rightContainer = document.getElementById('diff-grid-right');
+
+            if (diffGridLeftApi && leftContainer._allRows) {
+                const rows = diffShowUnchanged
+                    ? leftContainer._allRows
+                    : leftContainer._allRows.filter(r => r.__diff__ !== 'unchanged');
+                diffGridLeftApi.setGridOption('rowData', rows);
+            }
+            if (diffGridRightApi && rightContainer._allRows) {
+                const rows = diffShowUnchanged
+                    ? rightContainer._allRows
+                    : rightContainer._allRows.filter(r => r.__diff__ !== 'unchanged');
+                diffGridRightApi.setGridOption('rowData', rows);
+            }
+        }
+
+        // ========== Window Resize ==========
+        window.addEventListener('resize', () => {
+            if (gridApi) gridApi.sizeColumnsToFit();
+        });
+    </script>
+</body>
+</html>

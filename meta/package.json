@@ -1,0 +1,12 @@
+{
+  "name": "anode-meta",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "tree-kill": "^1.2.2"
+  }
+}

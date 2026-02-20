@@ -1,0 +1,17 @@
+build/
+cmake-build-*/
+.git
+.gitignore
+.idea/
+.vscode/
+.claude/
+node_modules/
+src/client/node_modules/
+src/client/dist/
+*.log
+output.txt
+postgres.conf
+graphs.db
+helm/
+docs/
+QA/

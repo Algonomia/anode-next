@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnodeServer Manager</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #888; --accent: #e94560;
+    --green: #4ecca3; --orange: #f0a500; --red: #e94560;
+    --blue: #4a9eff;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh;
+    display: flex; flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header span { font-size: 13px; color: var(--muted); }
+
+  /* Layout */
+  .container {
+    display: flex; flex: 1; overflow: hidden;
+  }
+  .sidebar {
+    width: 320px; min-width: 280px; padding: 16px; overflow-y: auto;
+    border-right: 1px solid var(--border); background: var(--surface);
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .main {
+    flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Sections */
+  .section h2 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; margin-bottom: 8px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.stopped { background: var(--red); }
+  .status-dot.building { background: var(--orange); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface); color: var(--text); cursor: pointer;
+    font-size: 13px; transition: all 0.15s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #c13350; }
+  button.success { background: var(--green); border-color: var(--green); color: #111; }
+  button.success:hover:not(:disabled) { background: #3db88e; }
+
+  /* Form fields */
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 13px; font-family: inherit;
+  }
+  .field input:focus, .field select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .field textarea {
+    width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace; resize: vertical; min-height: 80px;
+  }
+  .field textarea:focus { outline: none; border-color: var(--accent); }
+
+  .checkbox-field {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .checkbox-field input[type="checkbox"] { width: auto; }
+  .checkbox-field label { font-size: 13px; color: var(--text); margin: 0; }
+
+  /* Plugins */
+  .plugin-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; background: var(--bg); border-radius: 4px;
+    margin-bottom: 6px; font-size: 13px;
+  }
+  .plugin-item .name { font-weight: 500; }
+  .plugin-item .tag {
+    font-size: 11px; color: var(--muted); font-style: italic;
+  }
+  .plugin-item button { padding: 3px 10px; font-size: 12px; }
+
+  /* Banner */
+  .banner {
+    padding: 8px 12px; background: #f0a50022; border: 1px solid var(--orange);
+    border-radius: 4px; font-size: 12px; color: var(--orange);
+    display: none; margin-bottom: 8px;
+  }
+  .banner.visible { display: block; }
+
+  /* Console */
+  .console-panel {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+  }
+  .console-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .console-header h2 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin: 0;
+  }
+  .console-output {
+    flex: 1; background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px; line-height: 1.5; min-height: 100px;
+  }
+  .console-output .line-stdout { color: #c9d1d9; }
+  .console-output .line-stderr { color: var(--orange); }
+  .console-output .line-system { color: var(--muted); font-style: italic; }
+
+  /* Sources */
+  .source-card {
+    background: var(--bg); border-radius: 4px; padding: 10px;
+    margin-bottom: 8px; font-size: 13px;
+  }
+  .source-card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .source-card-header .name { font-weight: 600; }
+  .source-card-header .tags { display: flex; gap: 6px; }
+  .source-card-header .tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    background: var(--border); color: var(--muted);
+  }
+  .source-card .url { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .source-card .status-row {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .source-card .install-status { font-size: 12px; }
+  .source-card .install-status.installed { color: var(--green); }
+  .source-card .install-status.not-installed { color: var(--muted); }
+  .source-card .btn-row { gap: 4px; }
+  .source-card button { padding: 2px 8px; font-size: 11px; }
+
+  .source-form {
+    background: var(--bg); border-radius: 4px; padding: 10px;
+    margin-bottom: 8px;
+  }
+  .source-form .field { margin-bottom: 8px; }
+  .source-form .btn-row { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AnodeServer Manager</h1>
+  <span>meta :9090</span>
+</header>
+
+<div class="container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Server -->
+    <div class="section">
+      <h2>Server</h2>
+      <div class="status-badge">
+        <span id="serverDot" class="status-dot stopped"></span>
+        <span id="serverStatus">Stopped</span>
+      </div>
+      <div class="btn-row">
+        <button id="btnStart" class="success" onclick="serverStart()">Start</button>
+        <button id="btnStop" onclick="serverStop()" disabled>Stop</button>
+      </div>
+    </div>
+
+    <!-- Client -->
+    <div class="section">
+      <h2>Client (Vite :3000)</h2>
+      <div class="status-badge">
+        <span id="clientDot" class="status-dot stopped"></span>
+        <span id="clientStatus">Stopped</span>
+      </div>
+      <div class="btn-row">
+        <button id="btnClientStart" onclick="clientStart()">Start</button>
+        <button id="btnClientStop" onclick="clientStop()" disabled>Stop</button>
+      </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>Configuration</h2>
+      <div class="field">
+        <label>Address</label>
+        <input id="cfgAddress" type="text" value="0.0.0.0">
+      </div>
+      <div class="field">
+        <label>Port</label>
+        <input id="cfgPort" type="number" value="8080">
+      </div>
+      <div class="field">
+        <label>Graphs DB path</label>
+        <input id="cfgGraphsDb" type="text" value="./graphs.db">
+      </div>
+      <div class="field">
+        <label>Log level</label>
+        <select id="cfgLogLevel">
+          <option value="debug">debug</option>
+          <option value="info" selected>info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+        </select>
+      </div>
+      <div class="checkbox-field">
+        <input id="cfgProfiler" type="checkbox" checked>
+        <label for="cfgProfiler">Enable profiler</label>
+      </div>
+      <div class="checkbox-field">
+        <input id="cfgAutoClient" type="checkbox" checked>
+        <label for="cfgAutoClient">Auto-start client with server</label>
+      </div>
+      <button onclick="saveConfig()">Save Config</button>
+    </div>
+
+    <!-- Postgres -->
+    <div class="section">
+      <h2>Postgres Config</h2>
+      <div class="field">
+        <textarea id="cfgPostgres" rows="5" placeholder="host=localhost&#10;port=5432&#10;dbname=anode&#10;user=postgres"></textarea>
+      </div>
+    </div>
+
+    <!-- App Parameters -->
+    <div class="section">
+      <h2>App Parameters</h2>
+      <div class="field">
+        <textarea id="cfgAppParams" rows="3" placeholder="verifyCookie=true"></textarea>
+      </div>
+    </div>
+
+    <!-- Plugins -->
+    <div class="section">
+      <h2>Plugins</h2>
+      <div id="rebuildBanner" class="banner">Rebuild required after plugin changes</div>
+      <div id="pluginList"></div>
+    </div>
+
+    <!-- Sources -->
+    <div class="section">
+      <h2>Sources <button style="float:right;padding:2px 8px;font-size:11px" onclick="showSourceForm()">+ Add</button></h2>
+      <div id="sourceForm" style="display:none"></div>
+      <div id="sourceList"></div>
+    </div>
+
+  </div>
+
+  <!-- Main: Consoles -->
+  <div class="main">
+    <div class="console-panel">
+      <div class="console-header">
+        <h2>Build Console</h2>
+        <div class="btn-row">
+          <button id="btnBuild" class="primary" onclick="startBuild()">Build</button>
+          <button onclick="clearConsole('build')">Clear</button>
+        </div>
+      </div>
+      <div id="buildConsole" class="console-output"></div>
+    </div>
+
+    <div class="console-panel">
+      <div class="console-header">
+        <h2>Server Console</h2>
+        <div class="btn-row">
+          <button onclick="clearConsole('server')">Clear</button>
+        </div>
+      </div>
+      <div id="serverConsole" class="console-output"></div>
+    </div>
+
+    <div class="console-panel">
+      <div class="console-header">
+        <h2>Client Console</h2>
+        <div class="btn-row">
+          <button onclick="clearConsole('client')">Clear</button>
+        </div>
+      </div>
+      <div id="clientConsole" class="console-output"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────
+
+  let state = { server: { running: false }, client: { running: false }, build: { running: false }, git: { busy: false }, plugins: [], sources: [], config: {} };
+
+  // ── SSE Streams ────────────────────────────────────────────
+
+  function connectSSE(url, consoleId) {
+    const el = document.getElementById(consoleId);
+    const es = new EventSource(url);
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      const div = document.createElement('div');
+      div.className = `line-${data.type}`;
+      div.textContent = data.text;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    };
+    es.onerror = () => {
+      // reconnect handled by EventSource automatically
+    };
+    return es;
+  }
+
+  const buildSSE = connectSSE('/api/build/stream', 'buildConsole');
+  const serverSSE = connectSSE('/api/server/stream', 'serverConsole');
+  const clientSSE = connectSSE('/api/client/stream', 'clientConsole');
+  const gitSSE = connectSSE('/api/sources/stream', 'buildConsole');
+
+  // ── Polling ────────────────────────────────────────────────
+
+  async function poll() {
+    try {
+      const res = await fetch('/api/status');
+      state = await res.json();
+      updateUI();
+    } catch { /* ignore */ }
+  }
+
+  function updateUI() {
+    const { server, client, build, plugins, sources, config } = state;
+
+    // Server status
+    const dot = document.getElementById('serverDot');
+    const statusText = document.getElementById('serverStatus');
+    dot.className = 'status-dot ' + (server.running ? 'running' : 'stopped');
+    statusText.textContent = server.running ? `Running (PID ${server.pid})` : 'Stopped';
+
+    document.getElementById('btnStart').disabled = server.running || build.running;
+    document.getElementById('btnStop').disabled = !server.running;
+
+    // Client status
+    const cl = client || { running: false };
+    const clientDot = document.getElementById('clientDot');
+    const clientStatusText = document.getElementById('clientStatus');
+    clientDot.className = 'status-dot ' + (cl.running ? 'running' : 'stopped');
+    clientStatusText.textContent = cl.running ? `Running (PID ${cl.pid})` : 'Stopped';
+
+    document.getElementById('btnClientStart').disabled = cl.running;
+    document.getElementById('btnClientStop').disabled = !cl.running;
+
+    // Build
+    const btnBuild = document.getElementById('btnBuild');
+    btnBuild.disabled = build.running;
+    btnBuild.textContent = build.running ? 'Building...' : 'Build';
+
+    // Config (only update if not focused)
+    setIfNotFocused('cfgAddress', config.address);
+    setIfNotFocused('cfgPort', config.port);
+    setIfNotFocused('cfgGraphsDb', config.graphsDbPath);
+    setIfNotFocused('cfgPostgres', config.postgresConf);
+    setIfNotFocused('cfgAppParams', config.appParams);
+    if (document.activeElement !== document.getElementById('cfgLogLevel')) {
+      document.getElementById('cfgLogLevel').value = config.logLevel || 'info';
+    }
+    if (document.activeElement !== document.getElementById('cfgProfiler')) {
+      document.getElementById('cfgProfiler').checked = config.enableProfiler !== false;
+    }
+    if (document.activeElement !== document.getElementById('cfgAutoClient')) {
+      document.getElementById('cfgAutoClient').checked = config.autoStartClient !== false;
+    }
+
+    // Plugins
+    renderPlugins(plugins);
+    // Sources
+    renderSources(sources || []);
+  }
+
+  function setIfNotFocused(id, val) {
+    const el = document.getElementById(id);
+    if (document.activeElement !== el && val !== undefined) {
+      el.value = val;
+    }
+  }
+
+  function renderPlugins(plugins) {
+    const list = document.getElementById('pluginList');
+    list.innerHTML = '';
+    for (const p of plugins) {
+      const item = document.createElement('div');
+      item.className = 'plugin-item';
+      const remoteTag = p.source ? ' <span class="tag">(remote)</span>' : '';
+      if (p.locked) {
+        item.innerHTML = `<span><span class="name">${esc(p.name)}</span> <span class="tag">(core)</span></span>`;
+      } else {
+        const action = p.enabled ? 'disable' : 'enable';
+        const label = p.enabled ? 'Disable' : 'Enable';
+        item.innerHTML = `
+          <span><span class="name">${esc(p.name)}</span>${remoteTag}</span>
+          <button onclick="togglePlugin('${esc(p.name)}', '${action}')">${label}</button>`;
+      }
+      list.appendChild(item);
+    }
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── Actions ────────────────────────────────────────────────
+
+  async function serverStart() {
+    await fetch('/api/server/start', { method: 'POST' });
+    poll();
+  }
+
+  async function serverStop() {
+    await fetch('/api/server/stop', { method: 'POST' });
+    poll();
+  }
+
+  async function clientStart() {
+    await fetch('/api/client/start', { method: 'POST' });
+    poll();
+  }
+
+  async function clientStop() {
+    await fetch('/api/client/stop', { method: 'POST' });
+    poll();
+  }
+
+  async function startBuild() {
+    await fetch('/api/build', { method: 'POST' });
+    poll();
+  }
+
+  async function saveConfig() {
+    const body = {
+      address: document.getElementById('cfgAddress').value,
+      port: parseInt(document.getElementById('cfgPort').value) || 8080,
+      graphsDbPath: document.getElementById('cfgGraphsDb').value,
+      logLevel: document.getElementById('cfgLogLevel').value,
+      enableProfiler: document.getElementById('cfgProfiler').checked,
+      autoStartClient: document.getElementById('cfgAutoClient').checked,
+      postgresConf: document.getElementById('cfgPostgres').value,
+      appParams: document.getElementById('cfgAppParams').value,
+    };
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    poll();
+  }
+
+  async function togglePlugin(name, action) {
+    await fetch(`/api/plugins/${name}/${action}`, { method: 'POST' });
+    document.getElementById('rebuildBanner').classList.add('visible');
+    poll();
+  }
+
+  function clearConsole(which) {
+    document.getElementById(which + 'Console').innerHTML = '';
+  }
+
+  // ── Sources ─────────────────────────────────────────────────
+
+  let editingSourceId = null;
+
+  function showSourceForm(source) {
+    editingSourceId = source ? source.id : null;
+    const form = document.getElementById('sourceForm');
+    form.style.display = 'block';
+    form.innerHTML = `
+      <div class="source-form">
+        <div class="field">
+          <label>Type</label>
+          <select id="srcType">
+            <option value="github"${source?.type === 'github' ? ' selected' : ''}>GitHub</option>
+            <option value="gitlab"${source?.type === 'gitlab' ? ' selected' : ''}>GitLab</option>
+            <option value="other"${source?.type === 'other' ? ' selected' : ''}>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>URL</label>
+          <input id="srcUrl" type="text" value="${esc(source?.url || '')}" placeholder="https://github.com/user/repo.git" oninput="autoDeriveName()">
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input id="srcName" type="text" value="${esc(source?.name || '')}" placeholder="auto-derived from URL">
+        </div>
+        <div class="field">
+          <label>Token <span style="color:var(--muted)">(optional)</span></label>
+          <input id="srcToken" type="password" value="" placeholder="${source ? '(unchanged)' : ''}">
+        </div>
+        <div class="field">
+          <label>Branch</label>
+          <input id="srcBranch" type="text" value="${esc(source?.branch || 'main')}">
+        </div>
+        <div class="btn-row">
+          <button class="primary" onclick="saveSource()">${source ? 'Update' : 'Add'}</button>
+          <button onclick="hideSourceForm()">Cancel</button>
+          ${source ? `<button onclick="deleteSource('${source.id}')" style="color:var(--red);border-color:var(--red)">Delete</button>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function hideSourceForm() {
+    editingSourceId = null;
+    const form = document.getElementById('sourceForm');
+    form.style.display = 'none';
+    form.innerHTML = '';
+  }
+
+  function autoDeriveName() {
+    const urlVal = document.getElementById('srcUrl').value;
+    const nameEl = document.getElementById('srcName');
+    if (!editingSourceId && urlVal) {
+      try {
+        const pathname = new URL(urlVal).pathname;
+        const last = pathname.split('/').filter(Boolean).pop() || '';
+        nameEl.value = last.replace(/\.git$/, '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      } catch {}
+    }
+  }
+
+  async function saveSource() {
+    const body = {
+      type: document.getElementById('srcType').value,
+      url: document.getElementById('srcUrl').value,
+      name: document.getElementById('srcName').value,
+      branch: document.getElementById('srcBranch').value,
+    };
+    const tokenVal = document.getElementById('srcToken').value;
+    if (tokenVal) body.token = tokenVal;
+
+    const method = editingSourceId ? 'PUT' : 'POST';
+    const url = editingSourceId ? `/api/sources/${editingSourceId}` : '/api/sources';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Failed');
+      return;
+    }
+    hideSourceForm();
+    poll();
+  }
+
+  async function deleteSource(id) {
+    if (!confirm('Remove this source configuration? (Installed files are kept)')) return;
+    await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+    hideSourceForm();
+    poll();
+  }
+
+  async function testSource(id) {
+    const res = await fetch(`/api/sources/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Branches found:\n' + data.branches.join('\n'));
+    } else {
+      alert('Test failed: ' + (data.error || 'Unknown error'));
+    }
+  }
+
+  async function installSource(id) {
+    await fetch(`/api/sources/${id}/install`, { method: 'POST' });
+    poll();
+  }
+
+  async function updateSource(id) {
+    await fetch(`/api/sources/${id}/update`, { method: 'POST' });
+    poll();
+  }
+
+  async function removeSource(id) {
+    if (!confirm('Delete the plugin directory? This cannot be undone.')) return;
+    await fetch(`/api/sources/${id}/remove`, { method: 'POST' });
+    document.getElementById('rebuildBanner').classList.add('visible');
+    poll();
+  }
+
+  function renderSources(sources) {
+    const list = document.getElementById('sourceList');
+    list.innerHTML = '';
+    const gitBusy = state.git?.busy || false;
+    for (const s of sources) {
+      const card = document.createElement('div');
+      card.className = 'source-card';
+      let displayUrl = '';
+      try { displayUrl = new URL(s.url).host + new URL(s.url).pathname; } catch { displayUrl = s.url; }
+
+      let buttons = '';
+      if (s.installed) {
+        buttons = `
+          <button onclick="updateSource('${s.id}')" ${gitBusy ? 'disabled' : ''}>Update</button>
+          <button onclick="removeSource('${s.id}')" ${gitBusy ? 'disabled' : ''}>Remove</button>`;
+      } else {
+        buttons = `<button onclick="installSource('${s.id}')" ${gitBusy ? 'disabled' : ''}>Install</button>`;
+      }
+
+      card.innerHTML = `
+        <div class="source-card-header">
+          <span class="name">${esc(s.name)}</span>
+          <span class="tags">
+            <span class="tag">${esc(s.type)}</span>
+            <span class="tag">${esc(s.branch)}</span>
+          </span>
+        </div>
+        <div class="url">${esc(displayUrl)}</div>
+        <div class="status-row">
+          <span class="install-status ${s.installed ? 'installed' : 'not-installed'}">
+            ${s.installed ? '● Installed' : '○ Not installed'}
+          </span>
+          <div class="btn-row">
+            <button onclick="testSource('${s.id}')">Test</button>
+            <button onclick="showSourceForm(state.sources.find(x=>x.id==='${s.id}'))">Edit</button>
+            ${buttons}
+          </div>
+        </div>`;
+      list.appendChild(card);
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+
+  poll();
+  setInterval(poll, 2000);
+</script>
+</body>
+</html>

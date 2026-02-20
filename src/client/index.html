@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnodeServer - Graph Editor</title>
+    <link rel="stylesheet" href="./src/styles/main.css">
+</head>
+<body>
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <h1>Graph Editor</h1>
+        <div class="toolbar-group">
+            <button class="btn-secondary" onclick="newGraph()">New</button>
+            <button class="btn-secondary" onclick="openLoadModal()">Load</button>
+            <button class="btn-primary" onclick="saveGraph()">Save</button>
+        </div>
+        <div class="toolbar-group">
+            <button class="btn-success" onclick="executeGraph()">Execute</button>
+            <button class="btn-secondary" onclick="showHistory()">History</button>
+        </div>
+        <span id="status" class="status loading">Connecting...</span>
+        <div class="graph-name">
+            Graph: <strong id="current-graph-name">New Graph</strong>
+            <span id="graph-links"></span>
+            <button class="btn-discrete" onclick="downloadLocalBackup()" title="Download local backup">&#x2B73;</button>
+        </div>
+    </div>
+
+    <!-- Subgraph breadcrumb navigation -->
+    <div id="breadcrumb" class="breadcrumb" style="display: none;">
+        <span class="breadcrumb-item" onclick="navigateToRoot()">Root</span>
+    </div>
+
+    <!-- Main container with canvas and optional split panel -->
+    <div class="main-container">
+        <!-- Canvas -->
+        <div class="canvas-container">
+            <canvas id="graph-canvas"></canvas>
+        </div>
+
+        <!-- Resizer for split panel -->
+        <div class="resizer" id="panel-resizer"></div>
+
+        <!-- Split panel for ultra-wide screens -->
+        <div class="dataframe-panel" id="dataframe-panel">
+            <div class="panel-grid ag-theme-alpine-dark" id="panel-grid"></div>
+            <div class="panel-pagination">
+                <button class="btn-secondary" onclick="dfPrevPage()">Previous</button>
+                <span id="panel-page-info" class="page-info">Page 1 of 1</span>
+                <button class="btn-secondary" onclick="dfNextPage()">Next</button>
+                <button class="btn-close" onclick="closeSplitPanel()">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results panel (hidden for now) -->
+    <div class="results-panel" style="display: none;">
+        <h3>Execution Results</h3>
+        <div id="results-content" class="results-content">
+            No results yet. Execute a graph to see results.
+        </div>
+    </div>
+
+    <!-- Save Modal -->
+    <div id="save-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Save Graph</h2>
+            <div class="modal-form">
+                <label>Slug (URL-friendly ID)</label>
+                <input type="text" id="save-slug" placeholder="my-pipeline">
+                <label>Name</label>
+                <input type="text" id="save-name" placeholder="My Pipeline">
+                <label>Description (optional)</label>
+                <input type="text" id="save-description" placeholder="Description...">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeSaveModal()">Cancel</button>
+                <button class="btn-primary" onclick="confirmSave()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Modal -->
+    <div id="load-modal" class="modal-overlay">
+        <div class="modal">
+            <h2>Load Graph</h2>
+            <ul id="graph-list" class="graph-list">
+                <li>Loading...</li>
+            </ul>
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeLoadModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DataFrame Visualization Modal (fullscreen) -->
+    <div id="dataframe-modal" class="modal-overlay">
+        <div class="modal dataframe-modal">
+            <div id="dataframe-grid" class="ag-theme-alpine-dark"></div>
+            <div class="pagination">
+                <button class="btn-secondary" onclick="dfPrevPage()">Previous</button>
+                <span id="page-info" class="page-info">Page 1 of 1</span>
+                <button class="btn-secondary" onclick="dfNextPage()">Next</button>
+                <button class="btn-close" onclick="closeDataFrameModal()">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Editor Modal -->
+    <div id="csv-editor-modal" class="modal-overlay">
+        <div class="modal csv-editor-modal">
+            <div class="csv-editor-toolbar">
+                <button id="csv-add-row" class="btn-secondary btn-sm">+ Row</button>
+                <button id="csv-remove-row" class="btn-secondary btn-sm">- Row</button>
+                <div class="toolbar-sep"></div>
+                <button id="csv-add-col" class="btn-secondary btn-sm">+ Column</button>
+                <button id="csv-remove-col" class="btn-secondary btn-sm">- Column</button>
+                <div class="toolbar-sep"></div>
+                <label class="btn-secondary btn-sm csv-import-label">
+                    Import CSV
+                    <input type="file" accept=".csv,.tsv,.txt" style="display:none" id="csv-import-input">
+                </label>
+                <span id="csv-editor-info" class="csv-editor-info"></span>
+            </div>
+            <div id="csv-editor-grid" class="ag-theme-alpine-dark csv-editor-grid"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="csv-editor-cancel">Cancel</button>
+                <button class="btn-primary" id="csv-editor-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts help -->
+    <div class="shortcuts-help">
+        <kbd>Ctrl+G</kbd> Group &nbsp;
+        <kbd>Ctrl+Shift+G</kbd> Subgraph &nbsp;
+        <kbd>Ctrl+C/V/X</kbd> Copy/Paste/Cut &nbsp;
+        <kbd>Ctrl+Z/Y</kbd> Undo/Redo &nbsp;
+        <kbd>Alt+Drag</kbd> Clone &nbsp;
+        <kbd>Del</kbd> Delete
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

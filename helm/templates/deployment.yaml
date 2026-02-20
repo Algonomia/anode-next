@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      initContainers:
+        - name: init-data
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /app/data && chown 1000:1000 /app/data"]
+          volumeMounts:
+            - name: app-data
+              mountPath: /app/data
+      volumes:
+        - name: app-data
+          persistentVolumeClaim:
+            claimName: {{ .Chart.Name }}-pvc
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ports.meta }}
+              name: meta
+            - containerPort: {{ .Values.ports.api }}
+              name: api
+            - containerPort: {{ .Values.ports.client }}
+              name: client
+          env:
+            {{- range $key, $val := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+            # PostgreSQL credentials from Crunchy hippo secret
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName }}
+                  key: user
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName }}
+                  key: password
+            - name: PG_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName }}
+                  key: host
+            - name: PG_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName }}
+                  key: port
+            - name: PG_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secretName }}
+                  key: dbname
+          volumeMounts:
+            - name: app-data
+              mountPath: {{ .Values.volume.mountPath }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.probe.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probe.livenessProbe.path }}
+              port: {{ .Values.probe.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.probe.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probe.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.probe.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.probe.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probe.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probe.readinessProbe.path }}
+              port: {{ .Values.probe.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.probe.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probe.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.probe.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.probe.readinessProbe.failureThreshold }}
+          {{- end }}
+      {{- if .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml .Values.image.imagePullSecrets | nindent 8 }}
+      {{- end }}

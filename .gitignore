@@ -1,0 +1,76 @@
+# Build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Claude
+.claude/
+.mcp.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+
+# Output files
+output.txt
+*.log
+
+# Large data files (keep only small examples)
+examples/customers-500000.csv
+examples/output_*.csv
+examples/graphs.db
+old/
+
+# Credentials
+postgres.conf
+*.conf.local
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+
+# TypeScript / Build output
+src/client/dist/
+*.tsbuildinfo
+
+# Node plugins (keep only common/)
+src/nodes/nodes/*
+!src/nodes/nodes/common/
+
+# Meta server
+meta/meta-config.json
+
+# Package manager locks (optional - uncomment if you want to ignore)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

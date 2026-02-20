@@ -1,0 +1,55 @@
+{
+  "name": "@anode/client",
+  "version": "1.0.0",
+  "description": "TypeScript client library for AnodeServer DataFrame API",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "lib"
+  ],
+  "scripts": {
+    "build:lib": "tsup lib/index.ts --format cjs,esm --dts --clean",
+    "build": "vite build",
+    "build:mcp": "tsc -p tsconfig.mcp.json",
+    "dev": "vite",
+    "dev:lib": "tsup lib/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:mcp": "tsc -p tsconfig.mcp.json --noEmit",
+    "mcp": "node dist/mcp/index.js",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "dataframe",
+    "client",
+    "api",
+    "anode",
+    "graph-editor"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@comfyorg/litegraph": "^0.17.2",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@types/ws": "^8.18.1",
+    "ag-grid-community": "^32.3.3",
+    "ag-grid-enterprise": "^32.3.9",
+    "ws": "^8.19.0",
+    "zod": "^3.22.0"
+  }
+}

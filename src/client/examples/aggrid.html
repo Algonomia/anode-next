@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnodeServer - AG Grid Example</title>
+
+    <!-- AG Grid Enterprise CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/styles/ag-theme-alpine.css">
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        h1 { color: #333; margin-bottom: 10px; }
+
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.loading { background: #fff3cd; color: #856404; }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls h3 { margin-top: 0; color: #555; }
+
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-row select, .filter-row input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-row select { min-width: 150px; }
+        .filter-row input { flex: 1; min-width: 150px; }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button.primary { background: #007bff; color: white; }
+        button.primary:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; color: white; }
+        button.secondary:hover { background: #545b62; }
+
+        .buttons { display: flex; gap: 10px; margin-top: 15px; }
+
+        .stats {
+            background: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #495057;
+        }
+        .stats span { margin-right: 20px; }
+
+        #grid-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            height: 600px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AnodeServer DataFrame Viewer (AG Grid)</h1>
+
+        <div id="status" class="status">Connecting to server...</div>
+
+        <div class="controls">
+            <h3>Pivot (Column as Values)</h3>
+            <div class="filter-row">
+                <label style="min-width: 100px; padding: 8px 0;">Pivot column:</label>
+                <select id="pivot-column"><option value="">None</option></select>
+                <label style="min-width: 100px; padding: 8px 0; margin-left: 10px;">Value column:</label>
+                <select id="pivot-value"><option value="">None</option></select>
+            </div>
+            <div class="filter-row">
+                <label style="min-width: 100px; padding: 8px 0;">Index columns:</label>
+                <select id="pivot-index" multiple style="min-width: 200px; height: 60px;"></select>
+                <span style="color: #666; font-size: 12px; align-self: center;">Ctrl+click (or leave empty for auto)</span>
+            </div>
+
+            <h3>Group By (Tree Mode)</h3>
+            <div class="filter-row">
+                <select id="groupby-columns" multiple style="min-width: 200px; height: 80px;">
+                </select>
+                <button type="button" class="secondary" style="align-self: flex-start; padding: 5px 10px;" onclick="clearGroupBy()">Clear</button>
+                <span style="color: #666; font-size: 12px; align-self: center;">Ctrl+click to select multiple</span>
+            </div>
+            <div id="agg-selectors" style="display: none; margin-top: 10px;">
+                <p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>
+            </div>
+
+            <h3>Filters</h3>
+            <div class="filter-row">
+                <select id="filter-column"><option value="">Select column...</option></select>
+                <select id="filter-operator">
+                    <option value="==">equals (==)</option>
+                    <option value="!=">not equals (!=)</option>
+                    <option value="&lt;">less than (&lt;)</option>
+                    <option value="&lt;=">less or equal (&lt;=)</option>
+                    <option value="&gt;">greater than (&gt;)</option>
+                    <option value="&gt;=">greater or equal (&gt;=)</option>
+                    <option value="contains">contains</option>
+                </select>
+                <input type="text" id="filter-value" placeholder="Value...">
+            </div>
+
+            <h3>Sort</h3>
+            <div class="filter-row">
+                <select id="sort-column"><option value="">Select column...</option></select>
+                <select id="sort-order">
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+            </div>
+
+            <div class="buttons">
+                <button class="primary" onclick="applyFilters()">Apply</button>
+                <button class="secondary" onclick="resetFilters()">Reset</button>
+            </div>
+        </div>
+
+        <div id="stats" class="stats" style="display: none;"></div>
+
+        <div id="grid-container" class="ag-theme-alpine"></div>
+    </div>
+
+    <!-- AG Grid Enterprise JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.3.3/dist/ag-grid-enterprise.min.js"></script>
+
+    <script>
+        // AnodeClient
+        class AnodeClient {
+            constructor(baseUrl = 'http://localhost:8080') {
+                this.baseUrl = baseUrl.replace(/\/$/, '');
+            }
+            async health() {
+                const r = await fetch(`${this.baseUrl}/api/health`);
+                if (!r.ok) throw new Error(`Health check failed: ${r.statusText}`);
+                return r.json();
+            }
+            async datasetInfo() {
+                const r = await fetch(`${this.baseUrl}/api/dataset/info`);
+                if (!r.ok) throw new Error(`Failed to get dataset info: ${r.statusText}`);
+                return r.json();
+            }
+            async query(request) {
+                const r = await fetch(`${this.baseUrl}/api/dataset/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request),
+                });
+                if (!r.ok) throw new Error(`Query failed: ${r.statusText}`);
+                return r.json();
+            }
+        }
+
+        // State
+        let client;
+        let gridApi;
+        let datasetInfo;
+        let currentFilters = { column: '', operator: '==', value: '' };
+        let currentSort = { column: '', order: 'asc' };
+        let currentGroupBy = { columns: [], aggregations: {} };
+        let currentPivot = { pivotColumn: '', valueColumn: '', indexColumns: [] };
+        const PAGE_SIZE = 50;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', async () => {
+            client = new AnodeClient('http://localhost:8080');
+
+            try {
+                const health = await client.health();
+                if (!health.dataset_loaded) {
+                    showStatus('Server connected but no dataset loaded', 'error');
+                    return;
+                }
+
+                datasetInfo = await client.datasetInfo();
+                showStatus(`Connected - Dataset: ${datasetInfo.rows.toLocaleString()} rows, ${datasetInfo.columns.length} columns`, 'connected');
+
+                populateColumnSelectors(datasetInfo.columns);
+                initGrid(datasetInfo.columns);
+
+            } catch (error) {
+                showStatus(`Connection error: ${error.message}`, 'error');
+            }
+        });
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function populateColumnSelectors(columns) {
+            const filterCol = document.getElementById('filter-column');
+            const sortCol = document.getElementById('sort-column');
+            const groupByCols = document.getElementById('groupby-columns');
+            const pivotCol = document.getElementById('pivot-column');
+            const pivotValue = document.getElementById('pivot-value');
+            const pivotIndex = document.getElementById('pivot-index');
+
+            columns.forEach(col => {
+                filterCol.add(new Option(col.name, col.name));
+                sortCol.add(new Option(col.name, col.name));
+                groupByCols.add(new Option(col.name, col.name));
+                pivotCol.add(new Option(col.name, col.name));
+                pivotValue.add(new Option(col.name, col.name));
+                pivotIndex.add(new Option(col.name, col.name));
+            });
+
+            groupByCols.addEventListener('change', () => {
+                const selectedColumns = Array.from(groupByCols.selectedOptions).map(opt => opt.value);
+                updateAggregationSelectors(columns, selectedColumns);
+            });
+        }
+
+        function updateAggregationSelectors(columns, groupByColumns) {
+            const container = document.getElementById('agg-selectors');
+
+            if (!groupByColumns || groupByColumns.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+                return;
+            }
+
+            const groupBySet = new Set(groupByColumns);
+            container.style.display = 'block';
+            let html = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+
+            columns.forEach(col => {
+                if (groupBySet.has(col.name)) return;
+
+                const isNumeric = col.type === 'int' || col.type === 'double';
+                html += `
+                    <div class="filter-row" style="margin-bottom: 5px;">
+                        <label style="min-width: 120px; padding: 8px 0;">${col.name}:</label>
+                        <select id="agg-${col.name}" style="min-width: 100px;">
+                            <option value="" selected>(default)</option>
+                            <option value="sum" ${isNumeric ? '' : 'disabled'}>Sum</option>
+                            <option value="avg" ${isNumeric ? '' : 'disabled'}>Average</option>
+                            <option value="min">Min</option>
+                            <option value="max">Max</option>
+                            <option value="count">Count</option>
+                            <option value="first">First</option>
+                            <option value="blank">Blank</option>
+                        </select>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function buildOperations() {
+            const operations = [];
+
+            if (currentFilters.column && currentFilters.value) {
+                let value = currentFilters.value;
+                if (!isNaN(value) && value.trim() !== '') {
+                    value = parseFloat(value);
+                }
+                operations.push({
+                    type: 'filter',
+                    params: [{ column: currentFilters.column, operator: currentFilters.operator, value }]
+                });
+            }
+
+            if (currentSort.column) {
+                operations.push({
+                    type: 'orderby',
+                    params: [{ column: currentSort.column, order: currentSort.order }]
+                });
+            }
+
+            if (currentPivot.pivotColumn && currentPivot.valueColumn) {
+                const params = {
+                    pivotColumn: currentPivot.pivotColumn,
+                    valueColumn: currentPivot.valueColumn,
+                };
+                if (currentPivot.indexColumns.length > 0) {
+                    params.indexColumns = currentPivot.indexColumns;
+                }
+                operations.push({ type: 'pivot', params });
+            }
+
+            if (currentGroupBy.columns && currentGroupBy.columns.length > 0) {
+                operations.push({
+                    type: 'groupbytree',
+                    params: {
+                        groupBy: currentGroupBy.columns,
+                        aggregations: currentGroupBy.aggregations
+                    }
+                });
+            }
+
+            return operations;
+        }
+
+        function isPivotMode() {
+            return currentPivot.pivotColumn && currentPivot.valueColumn;
+        }
+
+        function isTreeMode() {
+            return currentGroupBy.columns && currentGroupBy.columns.length > 0;
+        }
+
+        function clearGroupBy() {
+            const groupByCols = document.getElementById('groupby-columns');
+            Array.from(groupByCols.options).forEach(opt => opt.selected = false);
+
+            const aggContainer = document.getElementById('agg-selectors');
+            aggContainer.style.display = 'none';
+            aggContainer.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+        }
+
+        function isSpecialMode() {
+            return isPivotMode() || isTreeMode();
+        }
+
+        // Convert columnar format to row objects
+        function columnarToRows(columns, data) {
+            return data.map(row => {
+                const obj = {};
+                columns.forEach((col, i) => {
+                    obj[col] = row[i];
+                });
+                return obj;
+            });
+        }
+
+        // Convert columnar format with _children to flat rows with orgHierarchy for AG Grid Tree Data
+        function columnarToTreeRows(columns, data, groupByColumns) {
+            const rows = [];
+
+            data.forEach((row, idx) => {
+                const childrenData = row[row.length - 1];
+
+                // Build the group row object
+                const groupObj = { _rowType: 'group' };
+                columns.forEach((col, i) => {
+                    groupObj[col] = row[i];
+                });
+
+                // Create hierarchy path from group-by column values
+                const groupPath = groupByColumns.map(col => String(groupObj[col] ?? `group_${idx}`));
+                groupObj.orgHierarchy = groupPath;
+
+                rows.push(groupObj);
+
+                // Process children if they exist - add as child rows under the group
+                if (Array.isArray(childrenData) && childrenData.length > 0) {
+                    childrenData.forEach((childRow, childIdx) => {
+                        const childObj = { _rowType: 'child' };
+                        columns.forEach((col, i) => {
+                            childObj[col] = childRow[i];
+                        });
+                        // Child path extends the group path
+                        childObj.orgHierarchy = [...groupPath, `_child_${childIdx}`];
+                        rows.push(childObj);
+                    });
+                }
+            });
+
+            return rows;
+        }
+
+        function createColumnDefs(columns, forTree = false) {
+            return columns.map((col, index) => {
+                const colDef = {
+                    field: typeof col === 'string' ? col : col.name,
+                    headerName: typeof col === 'string' ? col : col.name,
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                };
+
+                // For tree mode, make first column show the expand/collapse
+                if (forTree && index === 0) {
+                    colDef.cellRenderer = 'agGroupCellRenderer';
+                }
+
+                return colDef;
+            });
+        }
+
+        function initGrid(columns, specialMode = false, dynamicColumns = null) {
+            const gridContainer = document.getElementById('grid-container');
+
+            // Clear existing grid
+            gridContainer.innerHTML = '';
+            gridApi = null;
+
+            const colsToUse = dynamicColumns || columns;
+            const columnDefs = createColumnDefs(colsToUse, isTreeMode());
+
+            const gridOptions = {
+                columnDefs: columnDefs,
+                defaultColDef: {
+                    flex: 1,
+                    minWidth: 100,
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                },
+                animateRows: true,
+                rowSelection: 'single',
+                suppressRowClickSelection: true,
+            };
+
+            if (specialMode && isTreeMode()) {
+                // Tree mode with AG Grid Enterprise Tree Data
+                gridOptions.treeData = true;
+                gridOptions.getDataPath = (data) => data.orgHierarchy;
+                gridOptions.groupDefaultExpanded = 0; // Start collapsed
+                gridOptions.autoGroupColumnDef = {
+                    headerName: currentGroupBy.columns.join(' / '),
+                    minWidth: 250,
+                    flex: 1,
+                    cellRendererParams: {
+                        suppressCount: false,
+                    },
+                };
+                // Style group rows differently
+                gridOptions.getRowStyle = (params) => {
+                    if (params.data && params.data._rowType === 'group') {
+                        return { fontWeight: 'bold', backgroundColor: '#f8f9fa' };
+                    }
+                    return null;
+                };
+
+                // Load all data for tree mode
+                loadTreeData(gridOptions, gridContainer);
+            } else if (specialMode && isPivotMode()) {
+                // Pivot mode: load first page to get columns, then use pagination
+                loadPivotData(gridOptions, gridContainer);
+            } else {
+                // Normal mode: server-side pagination
+                gridOptions.rowModelType = 'infinite';
+                gridOptions.cacheBlockSize = PAGE_SIZE;
+                gridOptions.cacheOverflowSize = 2;
+                gridOptions.maxConcurrentDatasourceRequests = 1;
+                gridOptions.infiniteInitialRowCount = 1;
+                gridOptions.maxBlocksInCache = 10;
+
+                gridOptions.datasource = createInfiniteDatasource();
+
+                gridApi = agGrid.createGrid(gridContainer, gridOptions);
+            }
+        }
+
+        function createInfiniteDatasource() {
+            return {
+                getRows: async (params) => {
+                    const startRow = params.startRow;
+                    const endRow = params.endRow;
+                    const pageSize = endRow - startRow;
+
+                    try {
+                        showStatus('Loading...', 'loading');
+
+                        const result = await client.query({
+                            operations: buildOperations(),
+                            limit: pageSize,
+                            offset: startRow,
+                        });
+
+                        const totalRows = result.stats.output_rows;
+                        const rows = columnarToRows(result.columns, result.data);
+
+                        const currentPage = Math.floor(startRow / PAGE_SIZE) + 1;
+                        const lastPage = Math.ceil(totalRows / PAGE_SIZE);
+
+                        updateStats(result.stats, currentPage, lastPage);
+                        showStatus(`Connected - Showing rows ${startRow + 1} to ${Math.min(endRow, totalRows)} of ${totalRows}`, 'connected');
+
+                        // AG Grid infinite scroll callback
+                        params.successCallback(rows, totalRows);
+                    } catch (error) {
+                        showStatus(`Query error: ${error.message}`, 'error');
+                        params.failCallback();
+                    }
+                }
+            };
+        }
+
+        async function loadTreeData(gridOptions, gridContainer) {
+            try {
+                showStatus('Loading tree data...', 'loading');
+
+                const result = await client.query({
+                    operations: buildOperations(),
+                    limit: 100000,
+                });
+
+                const cols = result.columns || [];
+                const rows = columnarToTreeRows(cols, result.data, currentGroupBy.columns);
+
+                // Update column defs with actual columns from result (exclude auto-group column)
+                gridOptions.columnDefs = createColumnDefs(cols, true);
+                gridOptions.rowData = rows;
+
+                gridApi = agGrid.createGrid(gridContainer, gridOptions);
+
+                // Count groups (rows with _rowType === 'group')
+                const groupCount = rows.filter(r => r._rowType === 'group').length;
+                const childCount = rows.length - groupCount;
+                updateStats(result.stats, 1, 1);
+                showStatus(`Tree mode - ${groupCount} groups, ${childCount} child rows (click to expand)`, 'connected');
+            } catch (error) {
+                showStatus(`Query error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPivotData(gridOptions, gridContainer) {
+            try {
+                showStatus('Loading pivot data...', 'loading');
+
+                // First request to get the dynamic columns
+                const firstResult = await client.query({
+                    operations: buildOperations(),
+                    limit: PAGE_SIZE,
+                    offset: 0,
+                });
+
+                const cols = firstResult.columns || [];
+
+                // Update column defs with actual columns from pivot result
+                gridOptions.columnDefs = createColumnDefs(cols, false);
+
+                // Use infinite scroll for pivot data too
+                gridOptions.rowModelType = 'infinite';
+                gridOptions.cacheBlockSize = PAGE_SIZE;
+                gridOptions.cacheOverflowSize = 2;
+                gridOptions.maxConcurrentDatasourceRequests = 1;
+                gridOptions.infiniteInitialRowCount = 1;
+                gridOptions.maxBlocksInCache = 10;
+
+                gridOptions.datasource = createInfiniteDatasource();
+
+                gridApi = agGrid.createGrid(gridContainer, gridOptions);
+
+                const totalRows = firstResult.stats.output_rows;
+                const lastPage = Math.ceil(totalRows / PAGE_SIZE);
+                updateStats(firstResult.stats, 1, lastPage);
+                showStatus(`Pivot mode - ${totalRows} rows`, 'connected');
+            } catch (error) {
+                showStatus(`Query error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateStats(stats, page, lastPage) {
+            const statsEl = document.getElementById('stats');
+            statsEl.style.display = 'block';
+            statsEl.innerHTML = `
+                <span><strong>Total rows:</strong> ${stats.output_rows.toLocaleString()}</span>
+                <span><strong>Page:</strong> ${page} / ${lastPage}</span>
+                <span><strong>Query time:</strong> ${stats.duration_ms}ms</span>
+            `;
+        }
+
+        function applyFilters() {
+            currentFilters = {
+                column: document.getElementById('filter-column').value,
+                operator: document.getElementById('filter-operator').value,
+                value: document.getElementById('filter-value').value,
+            };
+            currentSort = {
+                column: document.getElementById('sort-column').value,
+                order: document.getElementById('sort-order').value,
+            };
+
+            // Pivot
+            const pivotIndexEl = document.getElementById('pivot-index');
+            currentPivot = {
+                pivotColumn: document.getElementById('pivot-column').value,
+                valueColumn: document.getElementById('pivot-value').value,
+                indexColumns: Array.from(pivotIndexEl.selectedOptions).map(opt => opt.value),
+            };
+
+            // Group By
+            const groupByCols = document.getElementById('groupby-columns');
+            const groupByColumns = Array.from(groupByCols.selectedOptions).map(opt => opt.value);
+            const groupBySet = new Set(groupByColumns);
+
+            const aggregations = {};
+            if (groupByColumns.length > 0) {
+                datasetInfo.columns.forEach(col => {
+                    if (!groupBySet.has(col.name)) {
+                        const selectEl = document.getElementById('agg-' + col.name);
+                        if (selectEl && selectEl.value !== '') {
+                            aggregations[col.name] = selectEl.value;
+                        }
+                    }
+                });
+            }
+
+            currentGroupBy = {
+                columns: groupByColumns,
+                aggregations: aggregations,
+            };
+
+            // Reinit grid with appropriate mode
+            initGrid(datasetInfo.columns, isSpecialMode());
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-column').value = '';
+            document.getElementById('filter-operator').value = '==';
+            document.getElementById('filter-value').value = '';
+            document.getElementById('sort-column').value = '';
+            document.getElementById('sort-order').value = 'asc';
+
+            // Reset pivot
+            document.getElementById('pivot-column').value = '';
+            document.getElementById('pivot-value').value = '';
+            Array.from(document.getElementById('pivot-index').options).forEach(opt => opt.selected = false);
+
+            // Deselect all groupby columns
+            const groupByCols = document.getElementById('groupby-columns');
+            Array.from(groupByCols.options).forEach(opt => opt.selected = false);
+
+            // Hide aggregation selectors
+            const aggContainer = document.getElementById('agg-selectors');
+            aggContainer.style.display = 'none';
+            aggContainer.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+
+            currentFilters = { column: '', operator: '==', value: '' };
+            currentSort = { column: '', order: 'asc' };
+            currentGroupBy = { columns: [], aggregations: {} };
+            currentPivot = { pivotColumn: '', valueColumn: '', indexColumns: [] };
+
+            // Reinit grid in normal mode
+            initGrid(datasetInfo.columns, false);
+        }
+    </script>
+</body>
+</html>

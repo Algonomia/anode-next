@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnodeServer - Tabulator Example</title>
+
+    <!-- Tabulator CSS -->
+    <link href="https://unpkg.com/tabulator-tables@6.2.1/dist/css/tabulator.min.css" rel="stylesheet">
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        h1 { color: #333; margin-bottom: 10px; }
+
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.loading { background: #fff3cd; color: #856404; }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls h3 { margin-top: 0; color: #555; }
+
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-row select, .filter-row input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-row select { min-width: 150px; }
+        .filter-row input { flex: 1; min-width: 150px; }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button.primary { background: #007bff; color: white; }
+        button.primary:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; color: white; }
+        button.secondary:hover { background: #545b62; }
+
+        .buttons { display: flex; gap: 10px; margin-top: 15px; }
+
+        .stats {
+            background: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #495057;
+        }
+        .stats span { margin-right: 20px; }
+
+        #table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AnodeServer DataFrame Viewer</h1>
+
+        <div id="status" class="status">Connecting to server...</div>
+
+        <div class="controls">
+            <h3>Pivot (Column as Values)</h3>
+            <div class="filter-row">
+                <label style="min-width: 100px; padding: 8px 0;">Pivot column:</label>
+                <select id="pivot-column"><option value="">None</option></select>
+                <label style="min-width: 100px; padding: 8px 0; margin-left: 10px;">Value column:</label>
+                <select id="pivot-value"><option value="">None</option></select>
+            </div>
+            <div class="filter-row">
+                <label style="min-width: 100px; padding: 8px 0;">Index columns:</label>
+                <select id="pivot-index" multiple style="min-width: 200px; height: 60px;"></select>
+                <span style="color: #666; font-size: 12px; align-self: center;">Ctrl+click (or leave empty for auto)</span>
+            </div>
+
+            <h3>Group By (Tree Mode)</h3>
+            <div class="filter-row">
+                <select id="groupby-columns" multiple style="min-width: 200px; height: 80px;">
+                </select>
+                <button type="button" class="secondary" style="align-self: flex-start; padding: 5px 10px;" onclick="clearGroupBy()">Clear</button>
+                <span style="color: #666; font-size: 12px; align-self: center;">Ctrl+click to select multiple</span>
+            </div>
+            <div id="agg-selectors" style="display: none; margin-top: 10px;">
+                <p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>
+            </div>
+
+            <h3>Filters</h3>
+            <div class="filter-row">
+                <select id="filter-column"><option value="">Select column...</option></select>
+                <select id="filter-operator">
+                    <option value="==">equals (==)</option>
+                    <option value="!=">not equals (!=)</option>
+                    <option value="&lt;">less than (&lt;)</option>
+                    <option value="&lt;=">less or equal (&lt;=)</option>
+                    <option value="&gt;">greater than (&gt;)</option>
+                    <option value="&gt;=">greater or equal (&gt;=)</option>
+                    <option value="contains">contains</option>
+                </select>
+                <input type="text" id="filter-value" placeholder="Value...">
+            </div>
+
+            <h3>Sort</h3>
+            <div class="filter-row">
+                <select id="sort-column"><option value="">Select column...</option></select>
+                <select id="sort-order">
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+            </div>
+
+            <div class="buttons">
+                <button class="primary" onclick="applyFilters()">Apply</button>
+                <button class="secondary" onclick="resetFilters()">Reset</button>
+            </div>
+        </div>
+
+        <div id="stats" class="stats" style="display: none;"></div>
+
+        <div id="table-container"></div>
+    </div>
+
+    <!-- Tabulator JS -->
+    <script src="https://unpkg.com/tabulator-tables@6.2.1/dist/js/tabulator.min.js"></script>
+
+    <script>
+        // AnodeClient
+        class AnodeClient {
+            constructor(baseUrl = 'http://localhost:8080') {
+                this.baseUrl = baseUrl.replace(/\/$/, '');
+            }
+            async health() {
+                const r = await fetch(`${this.baseUrl}/api/health`);
+                if (!r.ok) throw new Error(`Health check failed: ${r.statusText}`);
+                return r.json();
+            }
+            async datasetInfo() {
+                const r = await fetch(`${this.baseUrl}/api/dataset/info`);
+                if (!r.ok) throw new Error(`Failed to get dataset info: ${r.statusText}`);
+                return r.json();
+            }
+            async query(request) {
+                const r = await fetch(`${this.baseUrl}/api/dataset/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request),
+                });
+                if (!r.ok) throw new Error(`Query failed: ${r.statusText}`);
+                return r.json();
+            }
+        }
+
+        // State
+        let client;
+        let table;
+        let datasetInfo;
+        let currentFilters = { column: '', operator: '==', value: '' };
+        let currentSort = { column: '', order: 'asc' };
+        let currentGroupBy = { columns: [], aggregations: {} }; // columns: [], aggregations: {colName: "sum", ...}
+        let currentPivot = { pivotColumn: '', valueColumn: '', indexColumns: [] };
+        const PAGE_SIZE = 50;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', async () => {
+            client = new AnodeClient('http://localhost:8080');
+
+            try {
+                const health = await client.health();
+                if (!health.dataset_loaded) {
+                    showStatus('Server connected but no dataset loaded', 'error');
+                    return;
+                }
+
+                datasetInfo = await client.datasetInfo();
+                showStatus(`Connected - Dataset: ${datasetInfo.rows.toLocaleString()} rows, ${datasetInfo.columns.length} columns`, 'connected');
+
+                populateColumnSelectors(datasetInfo.columns);
+                initTable(datasetInfo.columns);
+
+            } catch (error) {
+                showStatus(`Connection error: ${error.message}`, 'error');
+            }
+        });
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function populateColumnSelectors(columns) {
+            const filterCol = document.getElementById('filter-column');
+            const sortCol = document.getElementById('sort-column');
+            const groupByCols = document.getElementById('groupby-columns');
+            const pivotCol = document.getElementById('pivot-column');
+            const pivotValue = document.getElementById('pivot-value');
+            const pivotIndex = document.getElementById('pivot-index');
+
+            columns.forEach(col => {
+                filterCol.add(new Option(col.name, col.name));
+                sortCol.add(new Option(col.name, col.name));
+                groupByCols.add(new Option(col.name, col.name));
+                pivotCol.add(new Option(col.name, col.name));
+                pivotValue.add(new Option(col.name, col.name));
+                pivotIndex.add(new Option(col.name, col.name));
+            });
+
+            // When groupby columns change, show aggregation selectors for other columns
+            groupByCols.addEventListener('change', () => {
+                const selectedColumns = Array.from(groupByCols.selectedOptions).map(opt => opt.value);
+                updateAggregationSelectors(columns, selectedColumns);
+            });
+        }
+
+        function updateAggregationSelectors(columns, groupByColumns) {
+            const container = document.getElementById('agg-selectors');
+
+            if (!groupByColumns || groupByColumns.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+                return;
+            }
+
+            const groupBySet = new Set(groupByColumns);
+            container.style.display = 'block';
+            let html = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+
+            columns.forEach(col => {
+                if (groupBySet.has(col.name)) return; // Skip groupby columns
+
+                const isNumeric = col.type === 'int' || col.type === 'double';
+                html += `
+                    <div class="filter-row" style="margin-bottom: 5px;">
+                        <label style="min-width: 120px; padding: 8px 0;">${col.name}:</label>
+                        <select id="agg-${col.name}" style="min-width: 100px;">
+                            <option value="" selected>(default)</option>
+                            <option value="sum" ${isNumeric ? '' : 'disabled'}>Sum</option>
+                            <option value="avg" ${isNumeric ? '' : 'disabled'}>Average</option>
+                            <option value="min">Min</option>
+                            <option value="max">Max</option>
+                            <option value="count">Count</option>
+                            <option value="first">First</option>
+                            <option value="blank">Blank</option>
+                        </select>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function buildOperations() {
+            const operations = [];
+
+            if (currentFilters.column && currentFilters.value) {
+                let value = currentFilters.value;
+                if (!isNaN(value) && value.trim() !== '') {
+                    value = parseFloat(value);
+                }
+                operations.push({
+                    type: 'filter',
+                    params: [{ column: currentFilters.column, operator: currentFilters.operator, value }]
+                });
+            }
+
+            if (currentSort.column) {
+                operations.push({
+                    type: 'orderby',
+                    params: [{ column: currentSort.column, order: currentSort.order }]
+                });
+            }
+
+            // Pivot - doit être avant groupbytree
+            if (currentPivot.pivotColumn && currentPivot.valueColumn) {
+                const params = {
+                    pivotColumn: currentPivot.pivotColumn,
+                    valueColumn: currentPivot.valueColumn,
+                };
+                if (currentPivot.indexColumns.length > 0) {
+                    params.indexColumns = currentPivot.indexColumns;
+                }
+                operations.push({ type: 'pivot', params });
+            }
+
+            // GroupBy Tree - doit être la dernière opération
+            if (currentGroupBy.columns && currentGroupBy.columns.length > 0) {
+                operations.push({
+                    type: 'groupbytree',
+                    params: {
+                        groupBy: currentGroupBy.columns,
+                        aggregations: currentGroupBy.aggregations // {colName: "sum", ...}
+                    }
+                });
+            }
+
+            return operations;
+        }
+
+        function isPivotMode() {
+            return currentPivot.pivotColumn && currentPivot.valueColumn;
+        }
+
+        function isTreeMode() {
+            return currentGroupBy.columns && currentGroupBy.columns.length > 0;
+        }
+
+        function clearGroupBy() {
+            const groupByCols = document.getElementById('groupby-columns');
+            Array.from(groupByCols.options).forEach(opt => opt.selected = false);
+
+            // Hide aggregation selectors
+            const aggContainer = document.getElementById('agg-selectors');
+            aggContainer.style.display = 'none';
+            aggContainer.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+        }
+
+        function isSpecialMode() {
+            return isPivotMode() || isTreeMode();
+        }
+
+        // Convert columnar format to row objects for Tabulator
+        function columnarToRows(columns, data) {
+            return data.map(row => {
+                const obj = {};
+                columns.forEach((col, i) => {
+                    obj[col] = row[i];
+                });
+                return obj;
+            });
+        }
+
+        // Convert columnar format with _children to row objects for Tabulator tree mode
+        function columnarToTreeRows(columns, data) {
+            return data.map(row => {
+                const obj = {};
+                // Last element is _children array
+                const childrenData = row[row.length - 1];
+
+                columns.forEach((col, i) => {
+                    obj[col] = row[i];
+                });
+
+                // Convert children from columnar to objects
+                if (Array.isArray(childrenData) && childrenData.length > 0) {
+                    obj._children = childrenData.map(childRow => {
+                        const childObj = {};
+                        columns.forEach((col, i) => {
+                            childObj[col] = childRow[i];
+                        });
+                        return childObj;
+                    });
+                }
+
+                return obj;
+            });
+        }
+
+        function initTable(columns, specialMode = false, dynamicColumns = null) {
+            // Destroy existing table if any
+            if (table) {
+                table.destroy();
+            }
+
+            let tabulatorColumns;
+            if (dynamicColumns) {
+                // Use dynamic columns from pivot result
+                tabulatorColumns = dynamicColumns.map(name => ({
+                    title: name,
+                    field: name,
+                    headerFilter: false,
+                }));
+            } else {
+                tabulatorColumns = columns.map(col => ({
+                    title: col.name,
+                    field: col.name,
+                    headerFilter: false,
+                }));
+            }
+
+            const config = {
+                columns: tabulatorColumns,
+                layout: 'fitDataFill',
+                height: '600px',
+                placeholder: 'Loading data...',
+            };
+
+            if (specialMode && isTreeMode()) {
+                // Tree mode: load all data at once
+                config.dataTree = true;
+                config.dataTreeStartExpanded = false;
+                config.dataTreeChildIndent = 20;
+                config.dataTreeElementColumn = tabulatorColumns[0]?.field || 'id';
+            }
+
+            if (!specialMode) {
+                // Normal mode: remote pagination
+                config.pagination = true;
+                config.paginationMode = 'remote';
+                config.paginationSize = PAGE_SIZE;
+                config.paginationSizeSelector = [25, 50, 100, 200];
+                config.ajaxURL = 'trigger';
+                config.ajaxRequestFunc = async function(url, cfg, params) {
+                    const page = params.page || 1;
+                    const size = params.size || PAGE_SIZE;
+                    const offset = (page - 1) * size;
+
+                    try {
+                        showStatus('Loading...', 'loading');
+
+                        const result = await client.query({
+                            operations: buildOperations(),
+                            limit: size,
+                            offset: offset,
+                        });
+
+                        const totalRows = result.stats.output_rows;
+                        const lastPage = Math.ceil(totalRows / size);
+
+                        updateStats(result.stats, page, lastPage);
+                        showStatus(`Connected - Showing page ${page} of ${lastPage}`, 'connected');
+
+                        // Convert columnar format to row objects
+                        const rows = columnarToRows(result.columns, result.data);
+
+                        return {
+                            last_page: lastPage,
+                            data: rows,
+                        };
+                    } catch (error) {
+                        showStatus(`Query error: ${error.message}`, 'error');
+                        return { last_page: 1, data: [] };
+                    }
+                };
+            }
+
+            table = new Tabulator('#table-container', config);
+
+            // If special mode, load data immediately
+            if (specialMode) {
+                loadSpecialData();
+            }
+        }
+
+        async function loadSpecialData() {
+            try {
+                showStatus('Loading data...', 'loading');
+
+                // Tree mode: load all data (no pagination for tree)
+                // Pivot mode: use pagination
+                if (isTreeMode()) {
+                    const result = await client.query({
+                        operations: buildOperations(),
+                        limit: 100000,
+                    });
+
+                    const cols = result.columns || [];
+                    const rows = columnarToTreeRows(cols, result.data);
+
+                    if (table) table.destroy();
+
+                    table = new Tabulator('#table-container', {
+                        columns: cols.map(name => ({ title: name, field: name, headerFilter: false })),
+                        layout: 'fitDataFill',
+                        height: '600px',
+                        data: rows,
+                        dataTree: true,
+                        dataTreeStartExpanded: false,
+                        dataTreeChildIndent: 20,
+                        dataTreeElementColumn: cols[0] || 'id',
+                    });
+
+                    updateStats(result.stats, 1, 1);
+                    showStatus(`Tree mode - ${result.stats.groups || result.stats.output_rows} groups loaded`, 'connected');
+                } else {
+                    // Pivot mode with pagination - need to get columns first
+                    const firstResult = await client.query({
+                        operations: buildOperations(),
+                        limit: PAGE_SIZE,
+                        offset: 0,
+                    });
+
+                    const cols = firstResult.columns || [];
+
+                    if (table) table.destroy();
+
+                    table = new Tabulator('#table-container', {
+                        columns: cols.map(name => ({ title: name, field: name, headerFilter: false })),
+                        layout: 'fitDataFill',
+                        height: '600px',
+                        pagination: true,
+                        paginationMode: 'remote',
+                        paginationSize: PAGE_SIZE,
+                        paginationSizeSelector: [25, 50, 100, 200],
+                        ajaxURL: 'trigger',
+                        ajaxRequestFunc: async function(url, cfg, params) {
+                            const page = params.page || 1;
+                            const size = params.size || PAGE_SIZE;
+                            const offset = (page - 1) * size;
+
+                            try {
+                                showStatus('Loading...', 'loading');
+
+                                const result = await client.query({
+                                    operations: buildOperations(),
+                                    limit: size,
+                                    offset: offset,
+                                });
+
+                                const totalRows = result.stats.output_rows;
+                                const lastPage = Math.ceil(totalRows / size);
+
+                                updateStats(result.stats, page, lastPage);
+                                showStatus(`Pivot mode - Page ${page} of ${lastPage}`, 'connected');
+
+                                const rows = columnarToRows(result.columns, result.data);
+
+                                return {
+                                    last_page: lastPage,
+                                    data: rows,
+                                };
+                            } catch (error) {
+                                showStatus(`Query error: ${error.message}`, 'error');
+                                return { last_page: 1, data: [] };
+                            }
+                        },
+                    });
+
+                    // Load first page data
+                    const rows = columnarToRows(cols, firstResult.data);
+                    const totalRows = firstResult.stats.output_rows;
+                    const lastPage = Math.ceil(totalRows / PAGE_SIZE);
+                    updateStats(firstResult.stats, 1, lastPage);
+                    showStatus(`Pivot mode - Page 1 of ${lastPage}`, 'connected');
+                }
+            } catch (error) {
+                showStatus(`Query error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateStats(stats, page, lastPage) {
+            const statsEl = document.getElementById('stats');
+            statsEl.style.display = 'block';
+            statsEl.innerHTML = `
+                <span><strong>Total rows:</strong> ${stats.output_rows.toLocaleString()}</span>
+                <span><strong>Page:</strong> ${page} / ${lastPage}</span>
+                <span><strong>Query time:</strong> ${stats.duration_ms}ms</span>
+            `;
+        }
+
+        function applyFilters() {
+            currentFilters = {
+                column: document.getElementById('filter-column').value,
+                operator: document.getElementById('filter-operator').value,
+                value: document.getElementById('filter-value').value,
+            };
+            currentSort = {
+                column: document.getElementById('sort-column').value,
+                order: document.getElementById('sort-order').value,
+            };
+
+            // Pivot
+            const pivotIndexEl = document.getElementById('pivot-index');
+            currentPivot = {
+                pivotColumn: document.getElementById('pivot-column').value,
+                valueColumn: document.getElementById('pivot-value').value,
+                indexColumns: Array.from(pivotIndexEl.selectedOptions).map(opt => opt.value),
+            };
+
+            // Group By
+            const groupByCols = document.getElementById('groupby-columns');
+            const groupByColumns = Array.from(groupByCols.selectedOptions).map(opt => opt.value);
+            const groupBySet = new Set(groupByColumns);
+
+            // Collect aggregations for each column not in groupBy
+            // Only include columns with a non-empty value (not "(default)")
+            const aggregations = {};
+            if (groupByColumns.length > 0) {
+                datasetInfo.columns.forEach(col => {
+                    if (!groupBySet.has(col.name)) {
+                        const selectEl = document.getElementById('agg-' + col.name);
+                        if (selectEl && selectEl.value !== '') {
+                            aggregations[col.name] = selectEl.value;
+                        }
+                    }
+                });
+            }
+
+            currentGroupBy = {
+                columns: groupByColumns,
+                aggregations: aggregations,
+            };
+
+            // Reinit table with appropriate mode
+            initTable(datasetInfo.columns, isSpecialMode());
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-column').value = '';
+            document.getElementById('filter-operator').value = '==';
+            document.getElementById('filter-value').value = '';
+            document.getElementById('sort-column').value = '';
+            document.getElementById('sort-order').value = 'asc';
+
+            // Reset pivot
+            document.getElementById('pivot-column').value = '';
+            document.getElementById('pivot-value').value = '';
+            Array.from(document.getElementById('pivot-index').options).forEach(opt => opt.selected = false);
+
+            // Deselect all groupby columns
+            const groupByCols = document.getElementById('groupby-columns');
+            Array.from(groupByCols.options).forEach(opt => opt.selected = false);
+
+            // Hide aggregation selectors
+            const aggContainer = document.getElementById('agg-selectors');
+            aggContainer.style.display = 'none';
+            aggContainer.innerHTML = '<p style="margin: 5px 0; color: #666; font-size: 13px;">Aggregation function for each column:</p>';
+
+            currentFilters = { column: '', operator: '==', value: '' };
+            currentSort = { column: '', order: 'asc' };
+            currentGroupBy = { columns: [], aggregations: {} };
+            currentPivot = { pivotColumn: '', valueColumn: '', indexColumns: [] };
+
+            // Reinit table in normal mode
+            initTable(datasetInfo.columns, false);
+        }
+    </script>
+</body>
+</html>

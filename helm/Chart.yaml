@@ -1,0 +1,12 @@
+apiVersion: v2
+name: anode
+description: A Helm chart for AnodeServer - graph-based data pipeline editor with meta server
+type: application
+version: 0.2.0
+appVersion: "1.0.0"
+keywords:
+  - anode
+  - cpp
+  - graph-editor
+  - data-pipeline
+  - postgresql
