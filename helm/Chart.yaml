@@ -1,5 +1,5 @@
 apiVersion: v2
-name: anode
+name: anode-next
 description: A Helm chart for AnodeServer - graph-based data pipeline editor with meta server
 type: application
 version: 0.2.0

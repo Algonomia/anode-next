@@ -1,11 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: anode
+  repository: ghcr.io/algonomia/anode
   pullPolicy: IfNotPresent
   tag: "latest"
-  imagePullSecrets:
-    - name: regcred-back
 
 # -- Ports exposed by the pod
 ports:
