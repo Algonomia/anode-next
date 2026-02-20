@@ -312,6 +312,10 @@
 </div>
 
 <script>
+  // ── Base Path ────────────────────────────────────────────────
+  // Detect base path from current URL (e.g. /anode-next/meta)
+  const API_BASE = window.location.pathname.replace(/\/+$/, '');
+
   // ── State ──────────────────────────────────────────────────
 
   let state = { server: { running: false }, client: { running: false }, build: { running: false }, git: { busy: false }, plugins: [], sources: [], config: {} };
@@ -320,7 +324,7 @@
 
   function connectSSE(url, consoleId) {
     const el = document.getElementById(consoleId);
-    const es = new EventSource(url);
+    const es = new EventSource(API_BASE + url);
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
       const div = document.createElement('div');
@@ -344,7 +348,7 @@
 
   async function poll() {
     try {
-      const res = await fetch('/api/status');
+      const res = await fetch(API_BASE + '/api/status');
       state = await res.json();
       updateUI();
     } catch { /* ignore */ }
@@ -435,27 +439,27 @@
   // ── Actions ────────────────────────────────────────────────
 
   async function serverStart() {
-    await fetch('/api/server/start', { method: 'POST' });
+    await fetch(API_BASE + '/api/server/start', { method: 'POST' });
     poll();
   }
 
   async function serverStop() {
-    await fetch('/api/server/stop', { method: 'POST' });
+    await fetch(API_BASE + '/api/server/stop', { method: 'POST' });
     poll();
   }
 
   async function clientStart() {
-    await fetch('/api/client/start', { method: 'POST' });
+    await fetch(API_BASE + '/api/client/start', { method: 'POST' });
     poll();
   }
 
   async function clientStop() {
-    await fetch('/api/client/stop', { method: 'POST' });
+    await fetch(API_BASE + '/api/client/stop', { method: 'POST' });
     poll();
   }
 
   async function startBuild() {
-    await fetch('/api/build', { method: 'POST' });
+    await fetch(API_BASE + '/api/build', { method: 'POST' });
     poll();
   }
 
@@ -470,7 +474,7 @@
       postgresConf: document.getElementById('cfgPostgres').value,
       appParams: document.getElementById('cfgAppParams').value,
     };
-    await fetch('/api/config', {
+    await fetch(API_BASE + '/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -479,7 +483,7 @@
   }
 
   async function togglePlugin(name, action) {
-    await fetch(`/api/plugins/${name}/${action}`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/plugins/${name}/${action}`, { method: 'POST' });
     document.getElementById('rebuildBanner').classList.add('visible');
     poll();
   }
@@ -560,7 +564,7 @@
     if (tokenVal) body.token = tokenVal;
 
     const method = editingSourceId ? 'PUT' : 'POST';
-    const url = editingSourceId ? `/api/sources/${editingSourceId}` : '/api/sources';
+    const url = editingSourceId ? `${API_BASE}/api/sources/${editingSourceId}` : `${API_BASE}/api/sources`;
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -577,13 +581,13 @@
 
   async function deleteSource(id) {
     if (!confirm('Remove this source configuration? (Installed files are kept)')) return;
-    await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/api/sources/${id}`, { method: 'DELETE' });
     hideSourceForm();
     poll();
   }
 
   async function testSource(id) {
-    const res = await fetch(`/api/sources/${id}/test`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/api/sources/${id}/test`, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
       alert('Branches found:\n' + data.branches.join('\n'));
@@ -593,18 +597,18 @@
   }
 
   async function installSource(id) {
-    await fetch(`/api/sources/${id}/install`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/sources/${id}/install`, { method: 'POST' });
     poll();
   }
 
   async function updateSource(id) {
-    await fetch(`/api/sources/${id}/update`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/sources/${id}/update`, { method: 'POST' });
     poll();
   }
 
   async function removeSource(id) {
     if (!confirm('Delete the plugin directory? This cannot be undone.')) return;
-    await fetch(`/api/sources/${id}/remove`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/sources/${id}/remove`, { method: 'POST' });
     document.getElementById('rebuildBanner').classList.add('visible');
     poll();
   }

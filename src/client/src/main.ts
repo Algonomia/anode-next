@@ -476,7 +476,7 @@ function executeGraph(): void {
   // Initialize metadata storage
   currentCsvMetadata = {};
 
-  executeGraphWithStream('', currentSlug, {
+  executeGraphWithStream(client.getBaseUrl(), currentSlug, {
     onStart: (sessionId, nodeCount) => {
       currentSessionId = sessionId;
       setSession(sessionId, {});

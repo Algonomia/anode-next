@@ -187,8 +187,19 @@ export interface RestoreExecutionResponse {
 export class AnodeClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = '') {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+  constructor(baseUrl?: string) {
+    if (baseUrl !== undefined) {
+      this.baseUrl = baseUrl.replace(/\/$/, '');
+    } else if (typeof window !== 'undefined') {
+      // Auto-detect base path from current URL (e.g. /anode-next -> /anode-next)
+      this.baseUrl = window.location.pathname.replace(/\/+$/, '');
+    } else {
+      this.baseUrl = '';
+    }
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   async getNodes(): Promise<NodeCatalogResponse> {
