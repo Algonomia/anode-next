@@ -295,6 +295,9 @@ target_link_libraries(benchmark_hosseinmoein PRIVATE
     DataFrame::DataFrame
 )
 
+option(BUILD_TESTING "Build test executables" ON)
+
+if(BUILD_TESTING)
 # Fetch Catch2 for testing
 FetchContent_Declare(
     Catch2
@@ -381,3 +384,5 @@ target_link_libraries(postgres_tests PRIVATE
 )
 
 catch_discover_tests(postgres_tests)
+
+endif() # BUILD_TESTING

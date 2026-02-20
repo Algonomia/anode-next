@@ -34,7 +34,7 @@ COPY meta/ meta/
 COPY examples/ examples/
 
 # Pre-build C++ server
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
     && cmake --build build --target anodeServer -j$(nproc)
 
 # Install client dependencies and build
