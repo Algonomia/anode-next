@@ -70,6 +70,7 @@ ingress:
   enabled: false
   className: nginx
   host: ""
+  basePath: /anode-next
   tls:
     enabled: false
     # -- Set secretName to use an existing TLS secret; leave empty for cert-manager auto-provisioning
