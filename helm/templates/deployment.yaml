@@ -65,10 +65,7 @@ spec:
                   name: {{ .Values.postgres.secretName }}
                   key: port
             - name: PG_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.postgres.secretName }}
-                  key: dbname
+              value: {{ .Values.postgres.dbname | default "postgres" | quote }}
           volumeMounts:
             - name: app-data
               mountPath: {{ .Values.volume.mountPath }}

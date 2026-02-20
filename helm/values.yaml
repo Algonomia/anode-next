@@ -50,10 +50,12 @@ securityContext:
 # Expected keys in secret: user, password, host, port, dbname
 postgres:
   secretName: hippo-pguser-postgres
+  dbname: "postgres"
 
 # -- Environment variables injected into the container
 env:
   GRAPHS_DB_PATH: "/app/data/graphs.db"
+  META_CONFIG_PATH: "/app/data/meta-config.json"
   VITE_HOST: "0.0.0.0"
 
 # -- Persistent volume for graphs.db and build cache

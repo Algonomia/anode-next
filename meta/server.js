@@ -9,7 +9,7 @@ import treeKill from 'tree-kill';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
-const CONFIG_PATH = join(__dirname, 'meta-config.json');
+const CONFIG_PATH = process.env.META_CONFIG_PATH || join(__dirname, 'meta-config.json');
 const NODES_DIR = join(ROOT, 'src', 'nodes', 'nodes');
 const BUILD_DIR = join(ROOT, 'build');
 const CLIENT_DIR = join(ROOT, 'src', 'client');
