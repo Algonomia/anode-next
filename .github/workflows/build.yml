@@ -1,4 +1,4 @@
-name: Build & Push Docker Images
+name: Build & Push Docker Image
 
 on:
   push:
@@ -18,16 +18,9 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build & push backend
+      - name: Build & push
         run: |
           TAG=${{ github.sha }}
-          docker build -f Dockerfile.backend -t ghcr.io/algonomia/anode-backend:${TAG} -t ghcr.io/algonomia/anode-backend:latest .
-          docker push ghcr.io/algonomia/anode-backend:${TAG}
-          docker push ghcr.io/algonomia/anode-backend:latest
-
-      - name: Build & push frontend
-        run: |
-          TAG=${{ github.sha }}
-          docker build -f Dockerfile.frontend -t ghcr.io/algonomia/anode-frontend:${TAG} -t ghcr.io/algonomia/anode-frontend:latest .
-          docker push ghcr.io/algonomia/anode-frontend:${TAG}
-          docker push ghcr.io/algonomia/anode-frontend:latest
+          docker build -t ghcr.io/algonomia/anode:${TAG} -t ghcr.io/algonomia/anode:latest .
+          docker push ghcr.io/algonomia/anode:${TAG}
+          docker push ghcr.io/algonomia/anode:latest
