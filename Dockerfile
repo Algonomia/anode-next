@@ -43,8 +43,8 @@ RUN cd src/client && npm ci && npm run build
 # Install meta server dependencies
 RUN cd meta && npm ci --production
 
-# Create data directory
-RUN mkdir -p /app/data && chown -R 1000:1000 /app/data
+# Set ownership for runtime user (build, client, data all need write access)
+RUN mkdir -p /app/data && chown -R 1000:1000 /app
 
 EXPOSE 9090 8080
 
