@@ -15,6 +15,7 @@ const BUILD_DIR = join(ROOT, 'build');
 const CLIENT_DIR = join(ROOT, 'src', 'client');
 
 const META_PORT = 9090;
+const AUTO_DEPLOY = process.env.ANODE_AUTO_DEPLOY === 'true' || process.argv.includes('--auto-deploy');
 
 // ── Config Management ──────────────────────────────────────────
 
@@ -45,6 +46,7 @@ function saveConfig(config) {
 
 let config = loadConfig();
 if (!config.sources) config.sources = [];
+mergeEnvSources();
 
 // ── Source Helpers ─────────────────────────────────────────────
 
@@ -74,6 +76,78 @@ function pluginNameFromUrl(url) {
 
 function isValidPluginName(name) {
   return /^[a-z][a-z0-9_]*$/.test(name) && !name.includes('..');
+}
+
+// ── Token Resolution ──────────────────────────────────────────
+
+function resolveSourceToken(source) {
+  const envKey = `ANODE_SOURCE_${source.name.toUpperCase()}_TOKEN`;
+  const envToken = process.env[envKey];
+  if (envToken) return envToken;
+  return source.token || '';
+}
+
+function resolveSourceForGit(source) {
+  return { ...source, token: resolveSourceToken(source) };
+}
+
+// ── Env Source Merging ────────────────────────────────────────
+
+function mergeEnvSources() {
+  const raw = process.env.ANODE_SOURCES;
+  if (!raw) return;
+
+  let envSources;
+  try {
+    envSources = JSON.parse(raw);
+  } catch (err) {
+    console.error(`[auto-deploy] Failed to parse ANODE_SOURCES: ${err.message}`);
+    return;
+  }
+
+  if (!Array.isArray(envSources)) {
+    console.error('[auto-deploy] ANODE_SOURCES must be a JSON array');
+    return;
+  }
+
+  let changed = false;
+  for (const envSrc of envSources) {
+    if (!envSrc.url) {
+      console.warn('[auto-deploy] Skipping source without url:', envSrc);
+      continue;
+    }
+
+    const name = envSrc.name || pluginNameFromUrl(envSrc.url);
+    if (!isValidPluginName(name)) {
+      console.warn(`[auto-deploy] Skipping source with invalid name: "${name}"`);
+      continue;
+    }
+
+    const existing = config.sources.find(s => s.name === name);
+    if (existing) {
+      if (envSrc.url !== undefined) existing.url = envSrc.url;
+      if (envSrc.type !== undefined) existing.type = envSrc.type;
+      if (envSrc.branch !== undefined) existing.branch = envSrc.branch;
+      if (envSrc.token !== undefined) existing.token = envSrc.token;
+      console.log(`[auto-deploy] Updated existing source: ${name}`);
+    } else {
+      config.sources.push({
+        id: randomUUID(),
+        name,
+        type: envSrc.type || 'github',
+        url: envSrc.url,
+        token: envSrc.token || '',
+        branch: envSrc.branch || 'main',
+      });
+      console.log(`[auto-deploy] Added new source: ${name}`);
+    }
+    changed = true;
+  }
+
+  if (changed) {
+    saveConfig(config);
+    console.log('[auto-deploy] Config saved with merged sources');
+  }
 }
 
 // ── Plugin Discovery ───────────────────────────────────────────
@@ -299,6 +373,17 @@ class BuildManager {
 
     return true;
   }
+
+  waitForCompletion() {
+    return new Promise((resolve) => {
+      if (!this.running || !this.process) {
+        return resolve(null);
+      }
+      this.process.on('close', (code) => {
+        resolve(code);
+      });
+    });
+  }
 }
 
 // ── Server Manager ─────────────────────────────────────────────
@@ -489,6 +574,78 @@ const serverManager = new ServerManager();
 const clientManager = new ClientManager();
 const gitManager = new GitManager();
 
+// ── Deploy Pipeline ──────────────────────────────────────────
+
+const deploySSE = new SSEManager();
+let deployStatus = 'idle';
+let deployError = null;
+
+async function runDeployPipeline() {
+  if (deployStatus === 'running') {
+    deploySSE.send({ type: 'stderr', text: '>>> Deploy already in progress' });
+    return { success: false, error: 'Deploy already in progress' };
+  }
+
+  deployStatus = 'running';
+  deployError = null;
+  deploySSE.clear();
+  deploySSE.send({ type: 'system', text: '>>> Auto-deploy pipeline started' });
+
+  try {
+    // Step 1: Clone sources that are not yet installed
+    const sourcesToClone = config.sources.filter(s => {
+      return !existsSync(join(NODES_DIR, s.name, '.git'));
+    });
+
+    if (sourcesToClone.length > 0) {
+      deploySSE.send({ type: 'system', text: `>>> ${sourcesToClone.length} source(s) to clone` });
+
+      for (const source of sourcesToClone) {
+        deploySSE.send({ type: 'system', text: `>>> Cloning ${source.name}...` });
+        await gitManager.clonePlugin(resolveSourceForGit(source));
+        deploySSE.send({ type: 'system', text: `>>> ${source.name} cloned successfully` });
+      }
+    } else {
+      deploySSE.send({ type: 'system', text: '>>> All sources already installed, skipping clone' });
+    }
+
+    // Step 2: Build
+    deploySSE.send({ type: 'system', text: '>>> Starting build...' });
+    const buildStarted = buildManager.start();
+    if (!buildStarted) {
+      throw new Error('Build failed to start (already running?)');
+    }
+
+    const exitCode = await buildManager.waitForCompletion();
+    if (exitCode !== 0) {
+      throw new Error(`Build failed with exit code ${exitCode}`);
+    }
+    deploySSE.send({ type: 'system', text: '>>> Build completed successfully' });
+
+    // Step 3: Start server
+    deploySSE.send({ type: 'system', text: '>>> Starting server...' });
+    const serverStarted = serverManager.start(config.anodeServer);
+    if (!serverStarted) {
+      throw new Error('Server failed to start (binary not found?)');
+    }
+
+    // Auto-start client if configured
+    if (config.anodeServer.autoStartClient !== false && !clientManager.running) {
+      deploySSE.send({ type: 'system', text: '>>> Starting client...' });
+      clientManager.start();
+    }
+
+    deploySSE.send({ type: 'system', text: '>>> Auto-deploy pipeline completed successfully' });
+    deployStatus = 'done';
+    return { success: true };
+  } catch (err) {
+    deploySSE.send({ type: 'stderr', text: `>>> Deploy pipeline failed: ${err.message}` });
+    deployStatus = 'failed';
+    deployError = err.message;
+    return { success: false, error: err.message };
+  }
+}
+
 // Status
 app.get('/api/status', (_req, res) => {
   const plugins = discoverPlugins();
@@ -511,6 +668,10 @@ app.get('/api/status', (_req, res) => {
     },
     git: {
       busy: gitManager.busy,
+    },
+    deploy: {
+      status: deployStatus,
+      error: deployError,
     },
     plugins,
     sources,
@@ -710,7 +871,7 @@ app.post('/api/sources/:id/test', async (req, res) => {
   const source = config.sources.find(s => s.id === req.params.id);
   if (!source) return res.status(404).json({ error: 'Source not found' });
   try {
-    const branches = await gitManager.testSource(source);
+    const branches = await gitManager.testSource(resolveSourceForGit(source));
     res.json({ branches });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -725,7 +886,7 @@ app.post('/api/sources/:id/install', async (req, res) => {
   }
   try {
     res.json({ message: 'Clone started' });
-    await gitManager.clonePlugin(source);
+    await gitManager.clonePlugin(resolveSourceForGit(source));
   } catch (err) {
     if (!res.headersSent) {
       res.status(err.status || 500).json({ error: err.message });
@@ -741,7 +902,7 @@ app.post('/api/sources/:id/update', async (req, res) => {
   }
   try {
     res.json({ message: 'Update started' });
-    await gitManager.updatePlugin(source);
+    await gitManager.updatePlugin(resolveSourceForGit(source));
   } catch (err) {
     if (!res.headersSent) {
       res.status(err.status || 500).json({ error: err.message });
@@ -764,6 +925,24 @@ app.get('/api/sources/stream', (_req, res) => {
   gitManager.sse.addClient(res);
 });
 
+// ── Deploy ──────────────────────────────────────────────────────
+
+app.post('/api/deploy', (_req, res) => {
+  if (deployStatus === 'running') {
+    return res.status(409).json({ error: 'Deploy already in progress' });
+  }
+  runDeployPipeline();
+  res.json({ message: 'Deploy pipeline started' });
+});
+
+app.get('/api/deploy/status', (_req, res) => {
+  res.json({ status: deployStatus, error: deployError });
+});
+
+app.get('/api/deploy/stream', (_req, res) => {
+  deploySSE.addClient(res);
+});
+
 // ── Cleanup ─────────────────────────────────────────────────────
 
 function cleanup() {
@@ -782,4 +961,15 @@ process.on('SIGINT', () => { cleanup(); process.exit(0); });
 
 app.listen(META_PORT, () => {
   console.log(`AnodeServer Meta running at http://localhost:${META_PORT}`);
+
+  if (AUTO_DEPLOY) {
+    console.log('[auto-deploy] Auto-deploy enabled, starting pipeline...');
+    runDeployPipeline().then(result => {
+      if (result.success) {
+        console.log('[auto-deploy] Pipeline completed successfully');
+      } else {
+        console.error(`[auto-deploy] Pipeline failed: ${result.error}`);
+      }
+    });
+  }
 });
