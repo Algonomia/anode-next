@@ -5,6 +5,7 @@ namespace nodes {
 /**
  * Register visualization nodes:
  * - timeline_output: publishes a DataFrame with timeline visualization metadata
+ * - list_output: publishes a DataFrame with selectable list visualization metadata
  */
 void registerVizNodes();
 
@@ -82,5 +83,51 @@ void registerDiffOutputNode();
  *   - output_metadata (String): JSON with field mappings and chart_type
  */
 void registerBarChartOutputNode();
+
+/**
+ * Register list_output node
+ *
+ * A node that "publishes" a DataFrame with selectable list visualization metadata.
+ * Displays a selectable list in the viewer with optional drilldown support.
+ *
+ * Inputs:
+ *   - csv (Csv, required): The DataFrame to publish
+ *   - label (Field, required): Column displayed in the list
+ *   - value (Field, optional): Column value associated with each item
+ *   - event (Field|String, optional): Target graph slug for drilldown
+ *
+ * Properties:
+ *   - _list_name (String, widget): Name for the list tab
+ *
+ * Outputs:
+ *   - csv (Csv): Pass-through of the input CSV
+ *   - output_name (String): The resolved list name
+ *   - output_type (String): Literal "list"
+ *   - output_metadata (String): JSON with field mappings
+ */
+void registerListOutputNode();
+
+/**
+ * Register button_output node
+ *
+ * A node that "publishes" a DataFrame with clickable button visualization metadata.
+ * Displays clickable buttons in the viewer with optional drilldown support.
+ *
+ * Inputs:
+ *   - csv (Csv, required): The DataFrame to publish
+ *   - name (Field, required): Column for the button name/identifier
+ *   - label (Field, required): Column for the button display text
+ *   - event (Field|String, optional): Target graph slug for drilldown
+ *
+ * Properties:
+ *   - _button_name (String, widget): Name for the button tab
+ *
+ * Outputs:
+ *   - csv (Csv): Pass-through of the input CSV
+ *   - output_name (String): The resolved button output name
+ *   - output_type (String): Literal "button"
+ *   - output_metadata (String): JSON with field mappings
+ */
+void registerButtonOutputNode();
 
 } // namespace nodes

@@ -657,13 +657,51 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
 
             nodes::Workload workload = parseInputValue(value);
 
-            // Strict type validation
+            // Type coercion: convert the value to match the expected node type
             auto expectedType = getExpectedScalarType(nodeType);
             if (expectedType.has_value() && workload.getType() != expectedType.value()) {
-                // Allow Int -> Double conversion
-                bool allowedConversion = (expectedType.value() == nodes::NodeType::Double
-                                          && workload.getType() == nodes::NodeType::Int);
-                if (!allowedConversion) {
+                auto from = workload.getType();
+                auto to = expectedType.value();
+                bool converted = false;
+
+                // Int -> Double
+                if (to == nodes::NodeType::Double && from == nodes::NodeType::Int) {
+                    workload = nodes::Workload(static_cast<double>(workload.getInt()), nodes::NodeType::Double);
+                    converted = true;
+                }
+                // Int -> String (e.g. timestamp -> date_value)
+                else if (to == nodes::NodeType::String && from == nodes::NodeType::Int) {
+                    workload = nodes::Workload(std::to_string(workload.getInt()), nodes::NodeType::String);
+                    converted = true;
+                }
+                // Double -> String
+                else if (to == nodes::NodeType::String && from == nodes::NodeType::Double) {
+                    workload = nodes::Workload(std::to_string(workload.getDouble()), nodes::NodeType::String);
+                    converted = true;
+                }
+                // String -> Int
+                else if (to == nodes::NodeType::Int && from == nodes::NodeType::String) {
+                    try {
+                        int64_t v = std::stoll(workload.getString());
+                        workload = nodes::Workload(v, nodes::NodeType::Int);
+                        converted = true;
+                    } catch (...) {}
+                }
+                // String -> Double
+                else if (to == nodes::NodeType::Double && from == nodes::NodeType::String) {
+                    try {
+                        double v = std::stod(workload.getString());
+                        workload = nodes::Workload(v, nodes::NodeType::Double);
+                        converted = true;
+                    } catch (...) {}
+                }
+                // Double -> Int
+                else if (to == nodes::NodeType::Int && from == nodes::NodeType::Double) {
+                    workload = nodes::Workload(static_cast<int64_t>(workload.getDouble()), nodes::NodeType::Int);
+                    converted = true;
+                }
+
+                if (!converted) {
                     if (skipUnknown) continue;
                     return json{
                         {"status", "error"},
@@ -672,8 +710,6 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
                                   ", got " + nodeTypeToErrorString(workload.getType())}
                     };
                 }
-                // Convert Int to Double
-                workload = nodes::Workload(static_cast<double>(workload.getInt()), nodes::NodeType::Double);
             }
 
             graph.setProperty(nodeId, "_value", workload);
@@ -824,6 +860,34 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
                     }
                 }
                 else if (node->definitionName == "viz/bar_chart_output") {
+                    auto itName = outputs.find("output_name");
+                    if (itName != outputs.end() && !itName->second.isNull()) {
+                        outputName = itName->second.getString();
+                    }
+                    auto itType = outputs.find("output_type");
+                    if (itType != outputs.end() && !itType->second.isNull()) {
+                        outputType = itType->second.getString();
+                    }
+                    auto itMeta = outputs.find("output_metadata");
+                    if (itMeta != outputs.end() && !itMeta->second.isNull()) {
+                        metadataJson = itMeta->second.getString();
+                    }
+                }
+                else if (node->definitionName == "viz/list_output") {
+                    auto itName = outputs.find("output_name");
+                    if (itName != outputs.end() && !itName->second.isNull()) {
+                        outputName = itName->second.getString();
+                    }
+                    auto itType = outputs.find("output_type");
+                    if (itType != outputs.end() && !itType->second.isNull()) {
+                        outputType = itType->second.getString();
+                    }
+                    auto itMeta = outputs.find("output_metadata");
+                    if (itMeta != outputs.end() && !itMeta->second.isNull()) {
+                        metadataJson = itMeta->second.getString();
+                    }
+                }
+                else if (node->definitionName == "viz/button_output") {
                     auto itName = outputs.find("output_name");
                     if (itName != outputs.end() && !itName->second.isNull()) {
                         outputName = itName->second.getString();
@@ -1175,6 +1239,34 @@ json RequestHandler::handleExecuteDynamic(const std::string& slug, const json& r
                     }
                 }
                 else if (node->definitionName == "viz/bar_chart_output") {
+                    auto itName = outputs.find("output_name");
+                    if (itName != outputs.end() && !itName->second.isNull()) {
+                        outputName = itName->second.getString();
+                    }
+                    auto itType = outputs.find("output_type");
+                    if (itType != outputs.end() && !itType->second.isNull()) {
+                        outputType = itType->second.getString();
+                    }
+                    auto itMeta = outputs.find("output_metadata");
+                    if (itMeta != outputs.end() && !itMeta->second.isNull()) {
+                        metadataJson = itMeta->second.getString();
+                    }
+                }
+                else if (node->definitionName == "viz/list_output") {
+                    auto itName = outputs.find("output_name");
+                    if (itName != outputs.end() && !itName->second.isNull()) {
+                        outputName = itName->second.getString();
+                    }
+                    auto itType = outputs.find("output_type");
+                    if (itType != outputs.end() && !itType->second.isNull()) {
+                        outputType = itType->second.getString();
+                    }
+                    auto itMeta = outputs.find("output_metadata");
+                    if (itMeta != outputs.end() && !itMeta->second.isNull()) {
+                        metadataJson = itMeta->second.getString();
+                    }
+                }
+                else if (node->definitionName == "viz/button_output") {
                     auto itName = outputs.find("output_name");
                     if (itName != outputs.end() && !itName->second.isNull()) {
                         outputName = itName->second.getString();

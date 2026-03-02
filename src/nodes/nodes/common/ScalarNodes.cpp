@@ -174,6 +174,7 @@ void registerDateValueNode() {
 
 void registerCurrentDateNode() {
     NodeBuilder("current_date", "scalar")
+        .output("value", Type::Int)
         .output("year", Type::Int)
         .output("month", Type::Int)
         .output("day", Type::Int)
@@ -197,8 +198,9 @@ void registerCurrentDateNode() {
             tm.tm_mday += dayOffset;
 
             // Normalize the date (handles month/year overflow)
-            std::mktime(&tm);
+            std::time_t normalized = std::mktime(&tm);
 
+            ctx.setOutput("value", int64_t(normalized));
             ctx.setOutput("year", int64_t(tm.tm_year + 1900));
             ctx.setOutput("month", int64_t(tm.tm_mon + 1));  // tm_mon is 0-based
             ctx.setOutput("day", int64_t(tm.tm_mday));

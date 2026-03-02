@@ -16,7 +16,7 @@ Reference of available nodes, organized by category.
 | `string_as_field` | `_value` | value(Field) | String as column reference |
 | `string_as_fields` | `_value` (JSON array) | value, value_1..99(Field) | List of column references (+/- widgets). Automatic expansion to nodes with dynamic inputs |
 | `date_value` | `_value` | value(String) | Configurable date |
-| `current_date` | - | value(String) | Current date |
+| `current_date` | - | value(Int), year(Int), month(Int), day(Int) | Current date as timestamp + components |
 | `scalars_to_csv` | - | csv(Csv) | Converts scalars to CSV |
 | `csv_value` | `_value` | csv(Csv) | Configurable DataFrame (editable in the editor) |
 
@@ -207,11 +207,14 @@ The `NodeExecutor` automatically adds implicit dependencies between define/ref n
 | Node | Inputs | Outputs | PostgreSQL Function |
 |------|--------|---------|---------------------|
 | `get_history_value` | in_tasks?, in_questions?, in_metadatavalues?, task_ids?, question_ids?, metadatavalue_ids? | csv, r_date, r_user_id, r_type, r_question_id, r_question_title, r_value, r_is_restorable | `anode_get_history_value_for_task` |
-| `get_history_snapshot` | in_questions?, task_id, question_ids, date | csv, source_type, question_id, question_title, value, dv_pev_*, metadatavalue_id, mdv_pev_* | `anode_get_history_snapshot_for_task` |
+| `get_history_snapshot` | in_questions?, task_id, question_ids?, date | csv, source_type, question_id, question_title, value, dv_pev_*, metadatavalue_id, mdv_pev_* | `anode_get_history_snapshot_for_task` |
+| `set_history_snapshot` | in_questions?, task_id, question_ids, date | csv, question_id, question_title, value | `anode_set_history_snapshot_for_task` |
 
 `get_history_value`: returns the complete modification history. At least one of the 3 _ids must be provided.
 
-`get_history_snapshot`: reconstructs the questionnaire state at a given date (one row per value, excludes deletes). All 3 inputs (task_id, question_ids, date) are required.
+`get_history_snapshot`: reconstructs the questionnaire state at a given date (one row per value, excludes deletes). `task_id` and `date` are required. `question_ids` is optional: if omitted (NULL), all questions for the task are included (resolved via task -> metatask -> action -> form -> section -> question).
+
+`set_history_snapshot`: restores the questionnaire state at a given date (writes back the snapshot). All 3 inputs (task_id, question_ids, date as epoch INT) are required. Returns one row per restored value.
 
 ---
 
@@ -233,6 +236,8 @@ See [DYNAMIC-NODES.md](DYNAMIC-NODES.md) for the complete equation injection sys
 | `timeline_output` | csv, start_date(Field), name(Field), end_date?(Field), parent?(Field), color?(Field\|String), event?(Field\|String) | `_timeline_name` | csv(Csv), output_name(String), output_type(String), output_metadata(String) | Publishes a vis-timeline |
 | `diff_output` | left(Csv), right(Csv), key?(Field) | `_diff_name` | csv(Csv), output_name(String), output_type(String), output_metadata(String) | Compares two CSVs side by side |
 | `bar_chart_output` | csv, category?(Field), value(Field), color?(Field\|String), event?(Field\|String) | `_chart_name` | csv(Csv), output_name(String), output_type(String), output_metadata(String) | Publishes an amCharts 5 bar chart (supports tree_group) |
+| `list_output` | csv, label(Field), value?(Field), event?(Field\|String) | `_list_name` | csv(Csv), output_name(String), output_type(String), output_metadata(String) | Publishes a selectable list with drilldown |
+| `button_output` | csv, name(Field\|String), label(Field\|String), event?(Field\|String) | `_button_name` | csv(Csv), output_name(String), output_type(String), output_metadata(String) | Publishes clickable buttons with drilldown |
 
 ### timeline_output
 

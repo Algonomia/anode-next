@@ -14,6 +14,8 @@ void registerVizNodes() {
     registerTimelineOutputNode();
     registerDiffOutputNode();
     registerBarChartOutputNode();
+    registerListOutputNode();
+    registerButtonOutputNode();
 }
 
 void registerTimelineOutputNode() {
@@ -618,6 +620,130 @@ void registerBarChartOutputNode() {
             ctx.setOutput("csv", csv);
             ctx.setOutput("output_name", Workload(outputName, Type::String));
             ctx.setOutput("output_type", Workload(std::string("chart"), Type::String));
+            ctx.setOutput("output_metadata", Workload(metadata.dump(), Type::String));
+        })
+        .buildAndRegister();
+}
+
+void registerListOutputNode() {
+    NodeBuilder("list_output", "viz")
+        .input("csv", Type::Csv)
+        .input("label", Type::Field)
+        .inputOptional("value", Type::Field)
+        .inputOptional("event", {Type::Field, Type::String})
+        .output("csv", Type::Csv)
+        .output("output_name", Type::String)
+        .output("output_type", Type::String)
+        .output("output_metadata", Type::String)
+        .onCompile([](NodeContext& ctx) {
+            auto csvWL = ctx.getInputWorkload("csv");
+            if (csvWL.isNull()) {
+                ctx.setError("No CSV input");
+                return;
+            }
+            auto csv = csvWL.getCsv();
+
+            auto labelWL = ctx.getInputWorkload("label");
+            if (labelWL.isNull()) {
+                ctx.setError("label field is required");
+                return;
+            }
+            std::string labelCol = labelWL.getString();
+
+            // Optional inputs
+            auto valueWL = ctx.getInputWorkload("value");
+            std::string valueCol = valueWL.isNull() ? "" : valueWL.getString();
+
+            auto eventWL = ctx.getInputWorkload("event");
+            std::string eventVal;
+            bool eventIsField = false;
+            if (!eventWL.isNull()) {
+                eventVal = eventWL.getString();
+                eventIsField = (eventWL.getType() == NodeType::Field);
+            }
+
+            // List name from widget property
+            auto listNameWL = ctx.getInputWorkload("_list_name");
+            std::string outputName = listNameWL.isNull() ? "" : listNameWL.getString();
+
+            // Build metadata JSON
+            json metadata;
+            metadata["label"] = labelCol;
+            if (!valueCol.empty()) {
+                metadata["value"] = valueCol;
+            }
+            if (!eventVal.empty()) {
+                metadata["event"] = eventVal;
+                metadata["event_is_field"] = eventIsField;
+            }
+
+            // Set outputs
+            ctx.setOutput("csv", csv);
+            ctx.setOutput("output_name", Workload(outputName, Type::String));
+            ctx.setOutput("output_type", Workload(std::string("list"), Type::String));
+            ctx.setOutput("output_metadata", Workload(metadata.dump(), Type::String));
+        })
+        .buildAndRegister();
+}
+
+void registerButtonOutputNode() {
+    NodeBuilder("button_output", "viz")
+        .input("csv", Type::Csv)
+        .input("name", {Type::Field, Type::String})
+        .input("label", {Type::Field, Type::String})
+        .inputOptional("event", {Type::Field, Type::String})
+        .output("csv", Type::Csv)
+        .output("output_name", Type::String)
+        .output("output_type", Type::String)
+        .output("output_metadata", Type::String)
+        .onCompile([](NodeContext& ctx) {
+            auto csvWL = ctx.getInputWorkload("csv");
+            if (csvWL.isNull()) {
+                ctx.setError("No CSV input");
+                return;
+            }
+            auto csv = csvWL.getCsv();
+
+            auto nameWL = ctx.getInputWorkload("name");
+            if (nameWL.isNull()) {
+                ctx.setError("name field is required");
+                return;
+            }
+            std::string nameVal = nameWL.getString();
+            bool nameIsField = (nameWL.getType() == NodeType::Field);
+
+            auto labelWL = ctx.getInputWorkload("label");
+            if (labelWL.isNull()) {
+                ctx.setError("label field is required");
+                return;
+            }
+            std::string labelVal = labelWL.getString();
+            bool labelIsField = (labelWL.getType() == NodeType::Field);
+
+            auto eventWL = ctx.getInputWorkload("event");
+            std::string eventVal;
+            bool eventIsField = false;
+            if (!eventWL.isNull()) {
+                eventVal = eventWL.getString();
+                eventIsField = (eventWL.getType() == NodeType::Field);
+            }
+
+            auto buttonNameWL = ctx.getInputWorkload("_button_name");
+            std::string outputName = buttonNameWL.isNull() ? "" : buttonNameWL.getString();
+
+            json metadata;
+            metadata["name"] = nameVal;
+            metadata["name_is_field"] = nameIsField;
+            metadata["label"] = labelVal;
+            metadata["label_is_field"] = labelIsField;
+            if (!eventVal.empty()) {
+                metadata["event"] = eventVal;
+                metadata["event_is_field"] = eventIsField;
+            }
+
+            ctx.setOutput("csv", csv);
+            ctx.setOutput("output_name", Workload(outputName, Type::String));
+            ctx.setOutput("output_type", Workload(std::string("button"), Type::String));
             ctx.setOutput("output_metadata", Workload(metadata.dump(), Type::String));
         })
         .buildAndRegister();

@@ -1112,6 +1112,22 @@
                 <div id="chart-container" style="width: 100%; height: 500px;"></div>
             </div>
 
+            <!-- List Section (between chart and grid, hidden if no lists) -->
+            <div id="list-section" style="display:none;">
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="list-tabs"></div>
+                </div>
+                <div id="list-container" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- Button Section (between list and grid, hidden if no buttons) -->
+            <div id="button-section" style="display:none;">
+                <div class="output-tabs-container">
+                    <div class="output-tabs" id="button-tabs"></div>
+                </div>
+                <div id="button-container" style="padding: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            </div>
+
             <div class="output-section">
                 <!-- Output Tabs -->
                 <div class="output-tabs-container">
@@ -1275,6 +1291,12 @@
         let dynamicZones = [];
         let chartOutputs = [];
         let currentChart = null;
+        let listOutputs = [];
+        let currentList = null;
+        let listRowData = null;    // { columns, rows, metadata } for drilldown
+        let buttonOutputs = [];
+        let currentButton = null;
+        let buttonRowData = null;  // { columns, rows, metadata } for drilldown
         let chartRoot = null;       // amCharts root instance (for cleanup)
         let chartRowData = null;    // { columns, rows, metadata } for drilldown
         let chartTreeAllRows = null; // all row objects for tree mode
@@ -1286,6 +1308,8 @@
         let drilldownTimelineOutputs = [];
         let drilldownDiffOutputs = [];
         let drilldownChartOutputs = [];
+        let drilldownListOutputs = [];
+        let drilldownButtonOutputs = [];
         let currentDrilldownOutput = null;
         let timelineRowData = null;    // { columns: [...], rows: [...] }
 
@@ -1843,6 +1867,267 @@
 
         // ---- End tree bar chart ----
 
+        // ========== Lists ==========
+
+        function renderListTabs(lists) {
+            const section = document.getElementById('list-section');
+            const container = document.getElementById('list-tabs');
+
+            if (lists.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            container.innerHTML = lists.map((o, i) => `
+                <button class="list-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectList('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectList(listName) {
+            document.querySelectorAll('.list-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === listName);
+            });
+
+            currentList = listOutputs.find(o => o.name === listName);
+            if (currentList) {
+                loadListData(currentList);
+            }
+        }
+
+        async function loadListData(output, slug) {
+            slug = slug || GRAPH_SLUG;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/output/${output.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 10000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const meta = output.metadata || {};
+                const columns = result.columns;
+                const rows = result.data;
+                const labelIdx = columns.indexOf(meta.label);
+                if (labelIdx < 0) return;
+
+                const valueIdx = meta.value ? columns.indexOf(meta.value) : -1;
+
+                // Store row data for drilldown
+                if (meta.event) {
+                    listRowData = { columns, rows, metadata: meta };
+                } else {
+                    listRowData = null;
+                }
+
+                const container = document.getElementById('list-container');
+                const hasEvent = !!meta.event;
+
+                let html = '<div style="padding: 8px;">';
+                rows.forEach((row, idx) => {
+                    const label = row[labelIdx] != null ? String(row[labelIdx]) : '';
+                    const value = valueIdx >= 0 && row[valueIdx] != null ? String(row[valueIdx]) : '';
+                    const cursor = hasEvent ? 'cursor: pointer;' : 'cursor: default;';
+                    const clickAttr = hasEvent ? `onclick="handleListClick(${idx})"` : '';
+                    html += `<div class="list-item" style="padding: 8px 12px; border-bottom: 1px solid #333; ${cursor} display: flex; justify-content: space-between; align-items: center;" ${clickAttr}
+                        onmouseover="this.style.backgroundColor='#2a2a3e'"
+                        onmouseout="this.style.backgroundColor=''">
+                        <span>${escapeHtml(label)}</span>
+                        ${value ? `<span style="color: #888; font-size: 0.9em;">${escapeHtml(value)}</span>` : ''}
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                console.error('List load error:', e);
+            }
+        }
+
+        async function handleListClick(rowIndex) {
+            if (!listRowData) return;
+            const { columns, rows, metadata } = listRowData;
+            const row = rows[rowIndex];
+            if (!row || !metadata.event) return;
+
+            // Resolve target graph slug
+            let targetSlug;
+            if (metadata.event_is_field) {
+                const eventIdx = columns.indexOf(metadata.event);
+                if (eventIdx < 0) return;
+                targetSlug = String(row[eventIdx]);
+            } else {
+                targetSlug = metadata.event;
+            }
+            if (!targetSlug) return;
+
+            // Build inputs: all columns of the clicked row
+            const inputs = {};
+            for (let i = 0; i < columns.length; i++) {
+                if (row[i] != null && row[i] !== '') {
+                    inputs[columns[i]] = row[i];
+                }
+            }
+
+            // Execute the target graph
+            try {
+                showStatus(`Executing drill-down: ${targetSlug}...`, 'loading');
+                const response = await fetch(`${BASE_URL}/api/graph/${targetSlug}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inputs: inputs,
+                        apply_overrides: true,
+                        skip_unknown_inputs: true
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') {
+                    showStatus(`Drill-down error: ${result.message || result.error}`, 'error');
+                    return;
+                }
+
+                showStatus(`Drill-down executed in ${result.duration_ms}ms. Loading outputs...`, 'connected');
+                await loadDrilldownOutputs(targetSlug);
+            } catch (e) {
+                showStatus(`Drill-down error: ${e.message}`, 'error');
+            }
+        }
+
+        // ========== Buttons ==========
+
+        function renderButtonTabs(buttons) {
+            const section = document.getElementById('button-section');
+            const container = document.getElementById('button-tabs');
+
+            if (buttons.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            container.innerHTML = buttons.map((o, i) => `
+                <button class="button-tab ${i === 0 ? 'active' : ''}"
+                        data-output="${escapeHtml(o.name)}"
+                        onclick="selectButton('${escapeHtml(o.name)}')">
+                    ${escapeHtml(o.name)}
+                    <span class="badge">${o.rows.toLocaleString()}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectButton(buttonName) {
+            document.querySelectorAll('.button-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.output === buttonName);
+            });
+
+            currentButton = buttonOutputs.find(o => o.name === buttonName);
+            if (currentButton) {
+                loadButtonData(currentButton);
+            }
+        }
+
+        async function loadButtonData(output, slug) {
+            slug = slug || GRAPH_SLUG;
+            try {
+                const response = await fetch(`${BASE_URL}/api/graph/${slug}/output/${output.name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 10000, offset: 0 })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') return;
+
+                const meta = output.metadata || {};
+                const columns = result.columns;
+                const rows = result.data;
+                const nameIsField = meta.name_is_field !== false;
+                const labelIsField = meta.label_is_field !== false;
+                const nameIdx = nameIsField ? columns.indexOf(meta.name) : -1;
+                const labelIdx = labelIsField ? columns.indexOf(meta.label) : -1;
+                const fixedName = !nameIsField ? meta.name : null;
+                const fixedLabel = !labelIsField ? meta.label : null;
+
+                if (meta.event) {
+                    buttonRowData = { columns, rows, metadata: meta };
+                } else {
+                    buttonRowData = null;
+                }
+
+                const container = document.getElementById('button-container');
+                const hasEvent = !!meta.event;
+
+                let html = '';
+                const rowCount = labelIsField ? rows.length : 1;
+                for (let idx = 0; idx < rowCount; idx++) {
+                    const row = rows[idx] || [];
+                    const label = fixedLabel || (labelIdx >= 0 && row[labelIdx] != null ? String(row[labelIdx]) : '');
+                    const name = fixedName || (nameIdx >= 0 && row[nameIdx] != null ? String(row[nameIdx]) : '');
+                    const clickAttr = hasEvent ? `onclick="handleButtonClick(${idx})"` : '';
+                    const cursor = hasEvent ? 'cursor: pointer;' : 'cursor: default;';
+                    const title = name ? `title="${escapeHtml(name)}"` : '';
+                    html += `<button class="btn" style="padding: 8px 16px; border: 1px solid #555; border-radius: 4px; background: #2a2a3e; color: #e0e0e0; font-size: 14px; ${cursor}" ${clickAttr} ${title}
+                        onmouseover="this.style.background='#3a3a5e'"
+                        onmouseout="this.style.background='#2a2a3e'">${escapeHtml(label)}</button>`;
+                }
+                container.innerHTML = html;
+            } catch (e) {
+                console.error('Button load error:', e);
+            }
+        }
+
+        async function handleButtonClick(rowIndex) {
+            if (!buttonRowData) return;
+            const { columns, rows, metadata } = buttonRowData;
+            const row = rows[rowIndex];
+            if (!row || !metadata.event) return;
+
+            let targetSlug;
+            if (metadata.event_is_field) {
+                const eventIdx = columns.indexOf(metadata.event);
+                if (eventIdx < 0) return;
+                targetSlug = String(row[eventIdx]);
+            } else {
+                targetSlug = metadata.event;
+            }
+            if (!targetSlug) return;
+
+            const inputs = {};
+            for (let i = 0; i < columns.length; i++) {
+                if (row[i] != null && row[i] !== '') {
+                    inputs[columns[i]] = row[i];
+                }
+            }
+
+            try {
+                showStatus(`Executing drill-down: ${targetSlug}...`, 'loading');
+                const response = await fetch(`${BASE_URL}/api/graph/${targetSlug}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inputs: inputs,
+                        apply_overrides: true,
+                        skip_unknown_inputs: true
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'ok') {
+                    showStatus(`Drill-down error: ${result.message || result.error}`, 'error');
+                    return;
+                }
+
+                showStatus(`Drill-down executed in ${result.duration_ms}ms. Loading outputs...`, 'connected');
+                await loadDrilldownOutputs(targetSlug);
+            } catch (e) {
+                showStatus(`Drill-down error: ${e.message}`, 'error');
+            }
+        }
+
         async function handleChartClick(rowIndex) {
             if (!chartRowData) return;
             const { columns, rows, metadata } = chartRowData;
@@ -1901,6 +2186,8 @@
             drilldownTimelineOutputs = [];
             drilldownDiffOutputs = [];
             drilldownChartOutputs = [];
+            drilldownListOutputs = [];
+            drilldownButtonOutputs = [];
             currentDrilldownOutput = null;
             document.querySelectorAll('.drilldown-tab, .drilldown-separator').forEach(el => el.remove());
         }
@@ -1966,7 +2253,9 @@
                 drilldownTimelineOutputs = allOutputs.filter(o => o.type === 'timeline');
                 drilldownDiffOutputs = allOutputs.filter(o => o.type === 'diff');
                 drilldownChartOutputs = allOutputs.filter(o => o.type === 'chart');
-                drilldownGridOutputs = allOutputs.filter(o => o.type !== 'timeline' && o.type !== 'diff' && o.type !== 'chart');
+                drilldownListOutputs = allOutputs.filter(o => o.type === 'list');
+                drilldownButtonOutputs = allOutputs.filter(o => o.type === 'button');
+                drilldownGridOutputs = allOutputs.filter(o => !['timeline','diff','chart','list','button'].includes(o.type));
 
                 renderDrilldownTabs();
 
@@ -1980,6 +2269,12 @@
                 if (drilldownChartOutputs.length > 0) {
                     selectDrilldownChart(drilldownChartOutputs[0].name);
                 }
+                if (drilldownListOutputs.length > 0) {
+                    selectDrilldownList(drilldownListOutputs[0].name);
+                }
+                if (drilldownButtonOutputs.length > 0) {
+                    selectDrilldownButton(drilldownButtonOutputs[0].name);
+                }
                 if (drilldownGridOutputs.length > 0) {
                     selectDrilldownOutput(drilldownGridOutputs[0].name);
                 }
@@ -1988,6 +2283,8 @@
                 if (drilldownTimelineOutputs.length > 0) count.push(`${drilldownTimelineOutputs.length} timeline(s)`);
                 if (drilldownDiffOutputs.length > 0) count.push(`${drilldownDiffOutputs.length} diff(s)`);
                 if (drilldownChartOutputs.length > 0) count.push(`${drilldownChartOutputs.length} chart(s)`);
+                if (drilldownListOutputs.length > 0) count.push(`${drilldownListOutputs.length} list(s)`);
+                if (drilldownButtonOutputs.length > 0) count.push(`${drilldownButtonOutputs.length} button(s)`);
                 if (drilldownGridOutputs.length > 0) count.push(`${drilldownGridOutputs.length} grid(s)`);
                 showStatus(`Drill-down: ${count.join(', ')} from ${slug}`, 'connected');
             } catch (e) {
@@ -2049,6 +2346,44 @@
                     btn.dataset.output = o.name;
                     btn.dataset.slug = drilldownSlug;
                     btn.onclick = () => selectDrilldownChart(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+
+            // Add drilldown list tabs
+            if (drilldownListOutputs.length > 0) {
+                const listSection = document.getElementById('list-section');
+                listSection.style.display = '';
+                const container = document.getElementById('list-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownListOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'list-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownList(o.name);
+                    btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
+                    container.appendChild(btn);
+                });
+            }
+
+            // Add drilldown button tabs
+            if (drilldownButtonOutputs.length > 0) {
+                const buttonSection = document.getElementById('button-section');
+                buttonSection.style.display = '';
+                const container = document.getElementById('button-tabs');
+                const sep = document.createElement('div');
+                sep.className = 'drilldown-separator';
+                container.appendChild(sep);
+                drilldownButtonOutputs.forEach(o => {
+                    const btn = document.createElement('button');
+                    btn.className = 'button-tab drilldown-tab';
+                    btn.dataset.output = o.name;
+                    btn.dataset.slug = drilldownSlug;
+                    btn.onclick = () => selectDrilldownButton(o.name);
                     btn.innerHTML = `&#x2192; ${escapeHtml(o.name)} <span class="badge">${o.rows.toLocaleString()}</span>`;
                     container.appendChild(btn);
                 });
@@ -2116,6 +2451,28 @@
             const output = drilldownChartOutputs.find(o => o.name === name);
             if (output) {
                 loadChartData(output, drilldownSlug);
+            }
+        }
+
+        function selectDrilldownList(name) {
+            document.querySelectorAll('.list-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.list-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            const output = drilldownListOutputs.find(o => o.name === name);
+            if (output) {
+                loadListData(output, drilldownSlug);
+            }
+        }
+
+        function selectDrilldownButton(name) {
+            document.querySelectorAll('.button-tab').forEach(t => t.classList.remove('active'));
+            const tab = document.querySelector(`.button-tab.drilldown-tab[data-output="${CSS.escape(name)}"]`);
+            if (tab) tab.classList.add('active');
+
+            const output = drilldownButtonOutputs.find(o => o.name === name);
+            if (output) {
+                loadButtonData(output, drilldownSlug);
             }
         }
 
@@ -2318,11 +2675,15 @@
                     timelineOutputs = outputs.filter(o => o.type === 'timeline');
                     diffOutputs = outputs.filter(o => o.type === 'diff');
                     chartOutputs = outputs.filter(o => o.type === 'chart');
-                    gridOutputs = outputs.filter(o => o.type !== 'timeline' && o.type !== 'diff' && o.type !== 'chart');
+                    listOutputs = outputs.filter(o => o.type === 'list');
+                    buttonOutputs = outputs.filter(o => o.type === 'button');
+                    gridOutputs = outputs.filter(o => !['timeline','diff','chart','list','button'].includes(o.type));
 
                     renderTimelineTabs(timelineOutputs);
                     renderDiffTabs(diffOutputs);
                     renderChartTabs(chartOutputs);
+                    renderListTabs(listOutputs);
+                    renderButtonTabs(buttonOutputs);
                     renderOutputTabs(gridOutputs);
 
                     if (outputs.length === 0) {
@@ -2333,6 +2694,8 @@
                         if (timelineOutputs.length > 0) count.push(`${timelineOutputs.length} timeline(s)`);
                         if (diffOutputs.length > 0) count.push(`${diffOutputs.length} diff(s)`);
                         if (chartOutputs.length > 0) count.push(`${chartOutputs.length} chart(s)`);
+                        if (listOutputs.length > 0) count.push(`${listOutputs.length} list(s)`);
+                        if (buttonOutputs.length > 0) count.push(`${buttonOutputs.length} button(s)`);
                         if (gridOutputs.length > 0) count.push(`${gridOutputs.length} grid(s)`);
                         showStatus(`Found ${count.join(', ')}.`, 'connected');
 
@@ -2344,6 +2707,12 @@
                         }
                         if (chartOutputs.length > 0) {
                             selectChart(chartOutputs[0].name);
+                        }
+                        if (listOutputs.length > 0) {
+                            selectList(listOutputs[0].name);
+                        }
+                        if (buttonOutputs.length > 0) {
+                            selectButton(buttonOutputs[0].name);
                         }
                         if (gridOutputs.length > 0) {
                             selectOutput(gridOutputs[0].name);

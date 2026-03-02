@@ -419,6 +419,14 @@ function addWidgets(node: AnodeLGraphNode, nodeName: string): void {
       addWidgetWithInput(node, 'text', '_chart_name', 'my_chart', 'string');
       break;
 
+    case 'list_output':
+      addWidgetWithInput(node, 'text', '_list_name', 'my_list', 'string');
+      break;
+
+    case 'button_output':
+      addWidgetWithInput(node, 'text', '_button_name', 'my_buttons', 'string');
+      break;
+
     case 'scalars_to_csv':
       setupScalarsToCsvNode(node);
       break;
