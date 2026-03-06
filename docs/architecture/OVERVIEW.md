@@ -35,12 +35,17 @@ anodeServer/
 │   │   └── PostgresPool.hpp/cpp
 │   ├── benchmark/          # Benchmarking tools
 │   │   └── BenchmarkReporter.hpp/cpp
-│   └── client/             # TypeScript client library
-│       ├── lib/
-│       │   ├── AnodeClient.ts
-│       │   └── index.ts
-│       └── examples/
-│           └── index.html
+│   ├── client/             # TypeScript client library
+│   │   ├── lib/
+│   │   │   ├── AnodeClient.ts
+│   │   │   └── index.ts
+│   │   └── examples/
+│   │       └── index.html
+│   └── angular/            # Angular Module Federation frontend
+│       ├── angular.json
+│       └── projects/
+│           ├── host/       # Shell app (loads remotes via federation)
+│           └── remote-grid/ # AG Grid viewer (exposed as remote)
 ├── examples/               # C++ examples and benchmarks
 ├── docs/                   # Documentation
 ├── build/                  # CMake build directory
@@ -54,8 +59,8 @@ anodeServer/
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Client Layer                              │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   Web Browser   │  │   TypeScript    │  │    curl/API     │  │
-│  │   (Tabulator)   │  │   AnodeClient   │  │     clients     │  │
+│  │  Angular Host   │  │   TypeScript    │  │    curl/API     │  │
+│  │ (Module Fed.)   │  │   AnodeClient   │  │     clients     │  │
 │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
 └───────────┼────────────────────┼────────────────────┼───────────┘
             │                    │                    │
@@ -197,3 +202,4 @@ make -j4
 - [API Reference](../api/REST-API.md)
 - [Node System](../nodes/SYSTEM.md)
 - [Dynamic Nodes](../nodes/DYNAMIC-NODES.md)
+- [Angular Module Federation](../angular/MODULE-FEDERATION.md)

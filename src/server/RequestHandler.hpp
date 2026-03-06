@@ -18,16 +18,24 @@ using json = nlohmann::json;
 
 /// Route handler result: {HTTP status code, JSON body}
 using RouteResult = std::pair<unsigned, json>;
+
+/// Per-request context built during validation, available to route handlers.
+struct RequestContext {
+    std::string userId;   // Resolved from sessionid cookie, empty if unknown
+};
+
 /// Plugin route handler: returns nullopt if route not matched
 using RouteHandler = std::function<
     std::optional<RouteResult>(const std::string& method,
                                const std::string& target,
-                               const json& body)>;
+                               const json& body,
+                               const RequestContext& ctx)>;
 /// Request validator: returns a RouteResult (e.g. 401) to block, or nullopt to allow
 using RequestValidator = std::function<
     std::optional<RouteResult>(const std::string& method,
                                const std::string& target,
-                               const std::map<std::string, std::string>& cookies)>;
+                               const std::map<std::string, std::string>& cookies,
+                               RequestContext& ctx)>;
 
 /**
  * Gestionnaire de requêtes - traite la logique métier
@@ -61,7 +69,8 @@ public:
     json handleUpdateGraph(const std::string& slug, const json& request);
     json handleDeleteGraph(const std::string& slug);
     json handleExecuteGraph(const std::string& slug, const json& request,
-                            const nodes::CsvOverrides& csvOverrides = {});
+                            const nodes::CsvOverrides& csvOverrides = {},
+                            const std::string& userId = "");
     json handleExecuteDynamic(const std::string& slug, const json& request);
     json handleApplyDynamic(const std::string& slug, const json& request);
     json handleGetDynamicEquations(const std::string& slug);
@@ -90,13 +99,14 @@ public:
     void registerRouteHandler(RouteHandler handler);
     std::optional<RouteResult> tryPluginRoutes(
         const std::string& method, const std::string& target,
-        const json& body) const;
+        const json& body, const RequestContext& ctx) const;
 
     // Request validation (authentication, authorization)
     void registerRequestValidator(RequestValidator validator);
     std::optional<RouteResult> validateRequest(
         const std::string& method, const std::string& target,
-        const std::map<std::string, std::string>& cookies) const;
+        const std::map<std::string, std::string>& cookies,
+        RequestContext& ctx) const;
 
     // Handlers pour les endpoints test scenarios
     json handleListScenarios(const std::string& slug);

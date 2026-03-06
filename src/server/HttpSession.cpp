@@ -134,6 +134,7 @@ http::response<http::string_body> HttpSession::handleRequest(
     }
 
     // Run request validators (authentication)
+    RequestContext ctx;
     {
         std::map<std::string, std::string> cookies;
         auto it = req.find(http::field::cookie);
@@ -156,13 +157,16 @@ http::response<http::string_body> HttpSession::handleRequest(
                 pos = semi + 1;
             }
         }
-        auto validationResult = handler.validateRequest(method, target, cookies);
+        auto validationResult = handler.validateRequest(method, target, cookies, ctx);
         if (validationResult) {
             auto [code, respJson] = *validationResult;
             return makeJsonResponse(
                 static_cast<http::status>(code), respJson,
                 req.version(), req.keep_alive(), requestId);
         }
+    }
+    if (!ctx.userId.empty()) {
+        LOG_INFO("User: " + ctx.userId + " " + method + " " + target);
     }
 
     // Helper to parse URL path segments
@@ -340,7 +344,7 @@ http::response<http::string_body> HttpSession::handleRequest(
                     }
                 }
 
-                json result = handler.handleExecuteGraph(slug, requestBody);
+                json result = handler.handleExecuteGraph(slug, requestBody, {}, ctx.userId);
                 http::status status = result.value("status", "") == "ok"
                     ? http::status::ok
                     : http::status::internal_server_error;
@@ -749,7 +753,7 @@ http::response<http::string_body> HttpSession::handleRequest(
             if (!req.body().empty()) {
                 try { body = json::parse(req.body()); } catch (...) {}
             }
-            auto pluginResult = handler.tryPluginRoutes(method, target, body);
+            auto pluginResult = handler.tryPluginRoutes(method, target, body, ctx);
             if (pluginResult) {
                 auto [code, respJson] = *pluginResult;
                 return makeJsonResponse(

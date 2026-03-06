@@ -183,7 +183,8 @@ public:
      * Returns map: nodeId -> (portName -> Workload)
      */
     std::unordered_map<std::string, std::unordered_map<std::string, Workload>>
-    execute(const NodeGraph& graph, const CsvOverrides& csvOverrides = {});
+    execute(const NodeGraph& graph, const CsvOverrides& csvOverrides = {},
+            const std::string& userId = "");
 
     /**
      * Execute a single node definition (for testing)

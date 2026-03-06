@@ -1,0 +1,45 @@
+.button-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: white;
+}
+
+.action-button {
+  padding: 8px 20px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #333;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: default;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &.clickable {
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+
+    &:hover {
+      background: #0056b3;
+      border-color: #0056b3;
+    }
+
+    &:active {
+      background: #004494;
+      border-color: #004494;
+    }
+  }
+}
+
+.button-empty {
+  padding: 16px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  width: 100%;
+}

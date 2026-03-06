@@ -570,7 +570,8 @@ json RequestHandler::handleDeleteGraph(const std::string& slug) {
 }
 
 json RequestHandler::handleExecuteGraph(const std::string& slug, const json& request,
-                                        const nodes::CsvOverrides& csvOverrides) {
+                                        const nodes::CsvOverrides& csvOverrides,
+                                        const std::string& userId) {
     if (!m_graphStorage) {
         return json{{"status", "error"}, {"message", "Graph storage not initialized"}};
     }
@@ -597,6 +598,7 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
     }
 
     // Parse and apply input overrides
+    std::unordered_set<std::string> inputIdentifiers;
     if (request.contains("inputs") && request["inputs"].is_object()) {
         // Build map identifier -> (nodeId, nodeType) for validation
         std::unordered_map<std::string, std::pair<std::string, std::string>> identifierToNode;
@@ -652,6 +654,7 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
                                   "' expects a JSON array of field names"}
                     };
                 }
+                inputIdentifiers.insert(identifier);
                 continue;
             }
 
@@ -713,6 +716,7 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
             }
 
             graph.setProperty(nodeId, "_value", workload);
+            inputIdentifiers.insert(identifier);
         }
     }
 
@@ -734,6 +738,7 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
         }
 
         for (const auto& [identifier, valueJsonStr] : overrides) {
+            if (inputIdentifiers.count(identifier)) continue;  // Inline inputs have priority
             auto nodeIt = identifierToNode.find(identifier);
             if (nodeIt == identifierToNode.end()) continue;  // Skip unknown identifiers silently
 
@@ -761,7 +766,7 @@ json RequestHandler::handleExecuteGraph(const std::string& slug, const json& req
     // Execute the graph
     try {
         nodes::NodeExecutor executor(nodes::NodeRegistry::instance());
-        auto results = executor.execute(graph, mergedOverrides);
+        auto results = executor.execute(graph, mergedOverrides, userId);
 
         // Check for node errors
         if (executor.hasErrors()) {
@@ -2050,10 +2055,10 @@ void RequestHandler::registerRouteHandler(RouteHandler handler) {
 
 std::optional<RouteResult> RequestHandler::tryPluginRoutes(
     const std::string& method, const std::string& target,
-    const json& body) const
+    const json& body, const RequestContext& ctx) const
 {
     for (const auto& handler : m_pluginRouteHandlers) {
-        auto result = handler(method, target, body);
+        auto result = handler(method, target, body, ctx);
         if (result) return result;
     }
     return std::nullopt;
@@ -2065,10 +2070,11 @@ void RequestHandler::registerRequestValidator(RequestValidator validator) {
 
 std::optional<RouteResult> RequestHandler::validateRequest(
     const std::string& method, const std::string& target,
-    const std::map<std::string, std::string>& cookies) const
+    const std::map<std::string, std::string>& cookies,
+    RequestContext& ctx) const
 {
     for (const auto& validator : m_requestValidators) {
-        auto result = validator(method, target, cookies);
+        auto result = validator(method, target, cookies, ctx);
         if (result) return result;
     }
     return std::nullopt;

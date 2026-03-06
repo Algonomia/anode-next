@@ -1,8 +1,8 @@
-# Events (Drill-down Timeline)
+# Events (Drill-down)
 
 ## Context
 
-Events allow chaining graph executions from user interactions. When a user clicks on a timeline entry in the viewer, a second graph is automatically executed with the clicked row's data as parameters. The target graph's outputs (timelines, CSV) appear as new tabs in the viewer.
+Events allow chaining graph executions from user interactions. When a user clicks on a timeline entry or a list item in the viewer, a second graph is automatically executed with the clicked row's data as parameters. The target graph's outputs (timelines, lists, CSV) appear as new tabs in the viewer.
 
 ## Principle
 
@@ -136,6 +136,55 @@ The target graph's outputs appear as new tabs with a distinct style:
    |-- Auto-selects the first timeline + grid tab
 ```
 
+## Frontend (Angular viewer)
+
+The Angular viewer (`remote-grid`) supports drill-down on **list** outputs.
+
+### Drill-down tabs
+
+The target graph's outputs appear below the primary sections, separated by an orange line:
+- Orange left border on tabs (`.drilldown-tab`)
+- Orange background on active tab
+- 2px orange separator between primary and drill-down sections
+
+### Behavior
+
+| Action | Result |
+|--------|--------|
+| Click on a list item (with `metadata.event`) | Executes the target graph, displays its outputs as drill-down tabs |
+| Click on another list item | Replaces the previous drill-down |
+| List without `metadata.event` | Items are not clickable (no pointer cursor) |
+
+### Technical flow
+
+```
+1. ListViewerComponent detects metadata.event → sets hasEvent signal → pointer cursor
+2. User clicks item → onItemClick() builds rowData from raw columns/rows
+3. ListViewerComponent emits DrilldownEvent { rowData }
+4. ViewerComponent.onListDrilldown():
+   |-- Reads metadata.event and metadata.event_is_field from selectedList()
+   |-- Resolves target slug (fixed or from rowData[event])
+   |-- POST /api/graph/{slug}/execute { inputs: rowData, skip_unknown_inputs: true }
+   |-- GET /api/graph/{slug}/outputs
+   |-- Sets drilldownSlug, drilldownOutputs signals
+   |-- Auto-selects first list + grid drilldown tab
+```
+
+### Key types
+
+```typescript
+// shared/models.ts
+interface DrilldownEvent {
+  rowData: Record<string, unknown>;
+}
+
+// services/anode-api.service.ts
+executeGraph(slug: string, options?: {
+  inputs?: Record<string, unknown>;
+  skip_unknown_inputs?: boolean;
+}): Observable<ExecuteGraphResponse>
+```
+
 ## Auto-detection of links between graphs
 
 On each save (create + update), the server scans the graph to detect links between graphs:
@@ -177,6 +226,10 @@ Badges also appear in the cards on the listing page.
 | `src/client/src/main.ts` | Calls `updateGraphLinks` on load/save |
 | `src/client/examples/viewer.html` | Click handler, drill-down tabs, datasource routing |
 | `src/client/examples/graphs.html` | Link badges in the cards |
+| `src/angular/.../shared/models.ts` | `DrilldownEvent` interface |
+| `src/angular/.../services/anode-api.service.ts` | `executeGraph()` with inputs + `skip_unknown_inputs` |
+| `src/angular/.../components/list-viewer/` | Emits `DrilldownEvent` on item click |
+| `src/angular/.../viewer/viewer.component.ts` | Drilldown signals, execute + load outputs logic |
 
 ## See also
 

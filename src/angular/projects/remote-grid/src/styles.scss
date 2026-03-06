@@ -1,0 +1,9 @@
+@use "ag-grid-community/styles/ag-grid.css";
+@use "ag-grid-community/styles/ag-theme-alpine.css";
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}

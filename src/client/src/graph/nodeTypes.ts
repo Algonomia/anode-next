@@ -491,6 +491,21 @@ function addWidgets(node: AnodeLGraphNode, nodeName: string): void {
         node.properties._label = v as NodeProperty;
       }, { property: '_label' });
       break;
+
+    case 'user_right_ids':
+      addWidgetWithInput(node, 'text', '_module', '', 'string');
+      addWidgetWithInput(node, 'text', '_table', '', 'string');
+      node.properties._right = 'read' as NodeProperty;
+      node.addWidget(
+        'combo',
+        '_right',
+        'read',
+        (v: unknown) => {
+          node.properties._right = v as NodeProperty;
+        },
+        { values: ['create', 'read', 'update', 'delete'], property: '_right' }
+      );
+      break;
   }
 }
 

@@ -128,7 +128,8 @@ void NodeExecutor::setExecutionCallback(ExecutionCallback callback) {
 }
 
 std::unordered_map<std::string, std::unordered_map<std::string, Workload>>
-NodeExecutor::execute(const NodeGraph& graph, const CsvOverrides& csvOverrides) {
+NodeExecutor::execute(const NodeGraph& graph, const CsvOverrides& csvOverrides,
+                      const std::string& userId) {
     m_results.clear();
 
     // Clear labels from previous execution
@@ -177,6 +178,7 @@ NodeExecutor::execute(const NodeGraph& graph, const CsvOverrides& csvOverrides) 
 
         // Create context
         NodeContext ctx;
+        ctx.setUserId(userId);
 
         // Set active CSV if available
         auto activeCsv = findActiveCsv(graph, nodeId);

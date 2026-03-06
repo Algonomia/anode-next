@@ -74,6 +74,11 @@ public:
     double getDoubleAtRow(const std::string& inputName, size_t rowIndex) const;
     std::string getStringAtRow(const std::string& inputName, size_t rowIndex) const;
 
+    // === Request Context ===
+
+    void setUserId(const std::string& userId) { m_userId = userId; }
+    const std::string& getUserId() const { return m_userId; }
+
     // === Error Handling ===
 
     void setError(const std::string& message);
@@ -106,6 +111,7 @@ private:
     std::unordered_map<std::string, Workload> m_inputs;
     std::unordered_map<std::string, Workload> m_outputs;
     std::shared_ptr<dataframe::DataFrame> m_activeCsv;
+    std::string m_userId;
     bool m_hasError = false;
     std::string m_errorMessage;
 };

@@ -1,0 +1,14 @@
+<div class="list-container">
+  @if (listLoading()) {
+    <div class="list-empty">Loading...</div>
+  } @else {
+    @for (item of listItems(); track item.index) {
+      <div class="list-item" [class.clickable]="hasEvent()" (click)="onItemClick(item)">
+        <span class="list-item-label">{{ item.label }}</span>
+        @if (item.value) {
+          <span class="list-item-value">{{ item.value }}</span>
+        }
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,16 @@
+<div class="button-container">
+  @if (loading()) {
+    <div class="button-empty">Loading...</div>
+  } @else {
+    @for (button of buttons(); track button.index) {
+      <button
+        class="action-button"
+        [class.clickable]="button.hasEvent"
+        [title]="button.name"
+        (click)="onButtonClick(button)"
+      >
+        {{ button.label }}
+      </button>
+    }
+  }
+</div>

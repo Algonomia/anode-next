@@ -53,8 +53,14 @@
 | Document | Description |
 |----------|-------------|
 | [PARAMETER-OVERRIDES.md](features/PARAMETER-OVERRIDES.md) | Value injection at execution time via overrides |
-| [EVENTS.md](features/EVENTS.md) | Drill-down: graph execution on timeline click |
+| [EVENTS.md](features/EVENTS.md) | Drill-down: graph execution on timeline/list click |
 | [DIFF-OUTPUT.md](features/DIFF-OUTPUT.md) | Side-by-side comparison of two CSVs with colored diff |
+
+## Angular
+
+| Document | Description |
+|----------|-------------|
+| [MODULE-FEDERATION.md](angular/MODULE-FEDERATION.md) | Native Federation: host/remote architecture, AG Grid viewer, adding remotes |
 
 ## Tools
 

@@ -1,0 +1,43 @@
+<div class="grid-wrapper">
+  @if (isTreeMode()) {
+    <ag-grid-angular
+      class="ag-theme-alpine"
+      style="width: 100%; height: 100%"
+      [columnDefs]="columnDefs()"
+      [rowData]="rowData()"
+      [defaultColDef]="defaultColDef"
+      [treeData]="true"
+      [getDataPath]="getDataPath"
+      [autoGroupColumnDef]="autoGroupColumnDef"
+      [groupDefaultExpanded]="1"
+      [suppressAggFuncInHeader]="true"
+      [animateRows]="true"
+      (gridReady)="onGridReady($event)"
+    />
+  } @else {
+    <ag-grid-angular
+      class="ag-theme-alpine"
+      style="width: 100%; height: 100%"
+      [columnDefs]="columnDefs()"
+      [defaultColDef]="defaultColDef"
+      rowModelType="infinite"
+      [cacheBlockSize]="100"
+      [cacheOverflowSize]="2"
+      [maxConcurrentDatasourceRequests]="1"
+      [infiniteInitialRowCount]="1"
+      [maxBlocksInCache]="10"
+      [animateRows]="true"
+      [rowSelection]="'single'"
+      [suppressRowClickSelection]="true"
+      (gridReady)="onGridReady($event)"
+      (sortChanged)="onSortChanged()"
+      (filterChanged)="onFilterChanged()"
+    />
+  }
+
+  @if (statsText()) {
+    <div class="stats-bar">
+      {{ statsText() }}
+    </div>
+  }
+</div>

@@ -1,0 +1,179 @@
+<div class="viewer">
+  <!-- Status bar -->
+  @if (statusMessage()) {
+    <div class="status-bar" [class]="'status-bar ' + statusType()">
+      {{ statusMessage() }}
+    </div>
+  }
+
+  <!-- List section -->
+  @if (listOutputs().length > 0) {
+    <div class="viz-section list-section">
+      @if (listOutputs().length > 1) {
+        <div class="output-tabs">
+          @for (output of listOutputs(); track output.name) {
+            <button
+              class="output-tab"
+              [class.active]="selectedList()?.name === output.name"
+              (click)="selectList(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (selectedList(); as list) {
+        <app-list-viewer
+          [slug]="slug()"
+          [output]="list"
+          (statusChange)="onChildStatus($event)"
+          (itemClick)="onListDrilldown($event)"
+        />
+      }
+    </div>
+  }
+
+  <!-- Button section -->
+  @if (buttonOutputs().length > 0) {
+    <div class="viz-section button-section">
+      @if (buttonOutputs().length > 1) {
+        <div class="output-tabs">
+          @for (output of buttonOutputs(); track output.name) {
+            <button
+              class="output-tab"
+              [class.active]="selectedButton()?.name === output.name"
+              (click)="selectButton(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (selectedButton(); as btn) {
+        <app-button-viewer
+          [slug]="slug()"
+          [output]="btn"
+          (statusChange)="onChildStatus($event)"
+          (buttonClick)="onButtonDrilldown($event)"
+        />
+      }
+    </div>
+  }
+
+  <!-- Grid section -->
+  @if (gridOutputs().length > 0) {
+    <div class="viz-section grid-section">
+      @if (gridOutputs().length > 1) {
+        <div class="output-tabs">
+          @for (output of gridOutputs(); track output.name) {
+            <button
+              class="output-tab"
+              [class.active]="selectedGrid()?.name === output.name"
+              (click)="selectGrid(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (selectedGrid(); as grid) {
+        <app-data-grid
+          [slug]="slug()"
+          [output]="grid"
+          (statusChange)="onChildStatus($event)"
+        />
+      }
+    </div>
+  }
+
+  <!-- Drilldown section -->
+  @if (drilldownSlug()) {
+    <div class="drilldown-separator"></div>
+
+    <!-- Drilldown list section -->
+    @if (drilldownListOutputs().length > 0) {
+      <div class="viz-section list-section">
+        <div class="output-tabs">
+          @for (output of drilldownListOutputs(); track output.name) {
+            <button
+              class="output-tab drilldown-tab"
+              [class.active]="selectedDrilldownList()?.name === output.name"
+              (click)="selectDrilldownList(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+
+        @if (selectedDrilldownList(); as list) {
+          <app-list-viewer
+            [slug]="drilldownSlug()!"
+            [output]="list"
+            (statusChange)="onChildStatus($event)"
+            (itemClick)="onDrilldownListDrilldown($event)"
+          />
+        }
+      </div>
+    }
+
+    <!-- Drilldown button section -->
+    @if (drilldownButtonOutputs().length > 0) {
+      <div class="viz-section button-section">
+        <div class="output-tabs">
+          @for (output of drilldownButtonOutputs(); track output.name) {
+            <button
+              class="output-tab drilldown-tab"
+              [class.active]="selectedDrilldownButton()?.name === output.name"
+              (click)="selectDrilldownButton(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+
+        @if (selectedDrilldownButton(); as btn) {
+          <app-button-viewer
+            [slug]="drilldownSlug()!"
+            [output]="btn"
+            (statusChange)="onChildStatus($event)"
+            (buttonClick)="onDrilldownButtonDrilldown($event)"
+          />
+        }
+      </div>
+    }
+
+    <!-- Drilldown grid section -->
+    @if (drilldownGridOutputs().length > 0) {
+      <div class="viz-section grid-section">
+        <div class="output-tabs">
+          @for (output of drilldownGridOutputs(); track output.name) {
+            <button
+              class="output-tab drilldown-tab"
+              [class.active]="selectedDrilldownGrid()?.name === output.name"
+              (click)="selectDrilldownGrid(output)"
+            >
+              {{ output.name }}
+              <span class="badge">{{ output.rows.toLocaleString() }}</span>
+            </button>
+          }
+        </div>
+
+        @if (selectedDrilldownGrid(); as grid) {
+          <app-data-grid
+            [slug]="drilldownSlug()!"
+            [output]="grid"
+            (statusChange)="onChildStatus($event)"
+          />
+        }
+      </div>
+    }
+  }
+</div>
